@@ -1,0 +1,16 @@
+//
+// Created by mario on 2/13/18.
+//
+
+#ifndef SCIENTIFIC_VISUALIZATION_SIMULATION_H
+#define SCIENTIFIC_VISUALIZATION_SIMULATION_H
+
+
+
+class Simulation {
+
+};
+
+
+
+#endif //SCIENTIFIC_VISUALIZATION_SIMULATION_H

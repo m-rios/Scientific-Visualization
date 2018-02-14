@@ -29,6 +29,7 @@ int   draw_vecs = 1;            //draw the vector field or not
 const int COLOR_BLACKWHITE=0;   //different types of color mapping: black-and-white, rainbow, banded
 const int COLOR_RAINBOW=1;
 const int COLOR_BANDS=2;
+const int COLOR_HEATMAP=3;
 int   scalar_col = 0;           //method for scalar coloring
 int   frozen = 0;               //toggles on/off the animation
 
@@ -74,6 +75,8 @@ int clamp(float x)
 
 float max(float x, float y)
 { return x > y ? x : y; }
+
+float min(float x, float y) {return x < y ? x : y;}
 
 //solve: Solve (compute) one step of the fluid flow simulation
 void solve(int n, fftw_real* vx, fftw_real* vy, fftw_real* vx0, fftw_real* vy0, fftw_real visc, fftw_real dt)
@@ -222,7 +225,24 @@ void rainbow(float value,float* R,float* G,float* B)
 	*B = max(0.0,(3-fabs(value-1)-fabs(value-2))/2);
 }
 
-//set_colormap: Sets three different types of colormaps
+//heatmap: Implements a heatmap color palette (Black-Red-Yellow-White).
+void heatmap(float value, float* R, float* G, float* B)
+{
+    //Clamp value between 0 and 1
+    if (value<0)
+        value=0;
+    if (value>1)
+        value=1;
+
+    //For now we don't mess with S,V, only with Hue
+    //Normalise value to [0,3] 0->Black, 1->Full red, 2-> Orange, 3->Full yellow.
+    value *= 4;
+    *R = max(0, 1 - fabs(value/2-1)) + max(0, 1 - fabs(value/2-2));
+    *B = max(0, 1 - fabs(value - 4));
+    *G = max(0, 1 - fabs(value-3)) + max(0, 1 - fabs(value-4));
+}
+
+//set_colormap: Sets different types of colormaps
 void set_colormap(float vy)
 {
 	float R,G,B;
@@ -239,6 +259,10 @@ void set_colormap(float vy)
 		vy/= NLEVELS;
 		rainbow(vy,&R,&G,&B);
 	}
+    else if (scalar_col==COLOR_HEATMAP)
+    {
+        heatmap(vy, &R, &G, &B);
+    }
 
 	glColor3f(R,G,B);
 }
@@ -272,6 +296,12 @@ void direction_to_color(float x, float y, int method)
 		r = g = b = 1;
 	}
 	glColor3f(r,g,b);
+}
+
+//interpolate: apply better than stock interpolation for more accurate value of pixels between vertices
+void interpolate(void)
+{
+
 }
 
 //visualize: This is the main visualization function
@@ -385,7 +415,7 @@ void keyboard(unsigned char key, int x, int y)
 			break;
 		case 'm':
 			scalar_col++;
-			if (scalar_col>COLOR_BANDS)
+			if (scalar_col>COLOR_HEATMAP)
 				scalar_col=COLOR_BLACKWHITE;
 			break;
 		case 'a': frozen = 1-frozen; break;
