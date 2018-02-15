@@ -5,7 +5,14 @@
 #include <rfftw.h>              //the numerical simulation FFTW library
 #include <stdio.h>              //for printing the help text
 #include <math.h>               //for various math functions
+
+#ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
+#endif
+
+#ifdef MACOS
+#include <GLUT/glut.h>            //the GLUT graphics library
+#endif
 
 
 
