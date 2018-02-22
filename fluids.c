@@ -39,7 +39,8 @@ const int COLOR_BANDS=2;
 const int COLOR_HEATMAP=3;
 int   scalar_col = 0;           //method for scalar coloring
 int   frozen = 0;               //toggles on/off the animation
-
+int n_values = 5;
+int   legend_size = 50;
 
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
@@ -274,6 +275,36 @@ void set_colormap(float vy)
 	glColor3f(R,G,B);
 }
 
+void draw_legend(void)
+{
+
+    float R, G, B;
+//    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+//    glBegin(GL_QUADS);
+    float step = (float) winHeight / (float) n_values;
+    for (int j = 0; j < n_values; ++j)
+    {
+//Normalise value (j) to [0,1]
+
+        float v = (float) j/((float) n_values);
+
+        float y0 = step*j;
+        float x0 = 500; //do not hardcode legend size
+        float y1 = step*(j+1);
+        float x1 = winWidth;
+        heatmap(v, &R, &G, &B);
+		glRecti(x0,y0,x1,y1);
+// R = 1; G = 0; B = 0;
+// color_test(j, &R, &G, &B);
+//Draw quad
+		  glColor3f(R,G,B);
+//        glVertex2f(x0, y0);
+//        glVertex2f(x1, y0);
+//        glVertex2f(x1, y1);
+//        glVertex2f(x0, y1);
+    }
+    //glEnd();
+}
 
 //direction_to_color: Set the current color by mapping a direction vector (x,y), using
 //                    the color mapping method 'method'. If method==1, map the vector direction
@@ -319,7 +350,7 @@ void visualize(void)
 	fftw_real  hn = (fftw_real)winHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
 
 	if (draw_smoke)
-	{	
+	{
 		int idx0, idx1, idx2, idx3;
 		double px0, py0, px1, py1, px2, py2, px3, py3;
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -374,6 +405,7 @@ void visualize(void)
 			}
 		glEnd();
 	}
+    draw_legend();
 }
 
 
@@ -492,7 +524,7 @@ int main(int argc, char **argv)
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-	glutInitWindowSize(500,500);
+	glutInitWindowSize(550,500);
 	glutCreateWindow("Real-time smoke simulation and visualization");
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
