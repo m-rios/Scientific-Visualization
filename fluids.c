@@ -530,8 +530,8 @@ void drag(int mx, int my)
 	static int lmx=0,lmy=0;				//remembers last mouse location
 
 	// Compute the array index that corresponds to the cursor location
-	xi = (int)clamp((double)(DIM + 1) * ((double)mx / (double)winWidth));
-	yi = (int)clamp((double)(DIM + 1) * ((double)(winHeight - my) / (double)winHeight));
+	xi = (int)clamp((double)(DIM + 1) * ((double)mx / (double)gridWidth));
+	yi = (int)clamp((double)(DIM + 1) * ((double)(gridHeight - my) / (double)gridHeight));
 
 	X = xi;
 	Y = yi;
