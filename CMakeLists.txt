@@ -12,6 +12,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 include_directories(${PROJECT_SOURCE_DIR}/fftw-2.1.5/include)
 link_directories(${PROJECT_SOURCE_DIR}/fftw-2.1.5/lib)
 
+file(GLOB CPP_FILES src/*.cpp)
+file(GLOB HEADER_FILES src/*.h)
+set(SOURCES ${CPP_FILES} ${HEADER_FILES})
+
 message("INCLUDE DIRECTORIES: ${PROJECT_SOURCE_DIR}/fftw-2.1.5/include")
 
 ## OS-specific dependencies ############################################################################################
@@ -39,11 +43,14 @@ endif()
 message(STATUS "The following libraries will be linked ${LIBS}")
 message("Linking directories: ")
 
-## sci-vis target ######################################################################################################
-set(SOURCES fluids.c)
-add_executable(smoke ${SOURCES})
+## smoke target ########################################################################################################
+set(SOURCES_SMOKE fluids.c)
+add_executable(smoke ${SOURCES_SMOKE})
 target_link_libraries(smoke ${LIBS})
 
+## sci-vis target ######################################################################################################
+add_executable(sci-vis ${SOURCES})
+target_link_libraries(sci-vis ${LIBS})
 
 ## Test target #########################################################################################################
 set(TESTS_SOURCES tests.c)
