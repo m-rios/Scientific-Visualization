@@ -48,10 +48,6 @@ set(SOURCES_SMOKE fluids.c)
 add_executable(smoke ${SOURCES_SMOKE})
 target_link_libraries(smoke ${LIBS})
 
-## sci-vis target ######################################################################################################
-add_executable(sci-vis ${SOURCES})
-target_link_libraries(sci-vis ${LIBS})
-
 ## Test target #########################################################################################################
 set(TESTS_SOURCES tests.c)
 add_executable(tests ${TESTS_SOURCES})
