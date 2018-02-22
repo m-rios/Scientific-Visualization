@@ -15,13 +15,13 @@ link_directories(${PROJECT_SOURCE_DIR}/fftw-2.1.5/lib)
 message("INCLUDE DIRECTORIES: ${PROJECT_SOURCE_DIR}/fftw-2.1.5/include")
 
 ## OS-specific dependencies ############################################################################################
-if (LINUX AND NOT APPLE)
+if (UNIX AND NOT APPLE)
     set(LINUX TRUE)
 endif ()
 
 if (LINUX)
     message(STATUS "Linux environment detected")
-    set(LIBS glut GL GLU m)
+    set(LIBS glut GL GLU m rfftw fftw)
     set(CMAKE_C_FLAGS "-O3 -march=x86-64 -mtune=generic -DNDEBUG -mfpmath=sse -ffast-math -Wall -pipe")
     add_definitions(-DLINUX)
 elseif(APPLE)
@@ -49,3 +49,8 @@ target_link_libraries(smoke ${LIBS})
 set(TESTS_SOURCES tests.c)
 add_executable(tests ${TESTS_SOURCES})
 target_link_libraries(tests ${LIBS})
+
+## Main target #########################################################################################################
+set(TESTS_SOURCES main.c)
+add_executable(main ${TESTS_SOURCES})
+target_link_libraries(main ${LIBS})
