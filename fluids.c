@@ -5,17 +5,39 @@
 #include <rfftw.h>              //the numerical simulation FFTW library
 #include <stdio.h>              //for printing the help text
 #include <math.h>               //for various math functions
-
+#include "GL/glui.h"
 #ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
+#include "UI.h"
 #endif
 
 #ifdef MACOS
 #include <GLUT/glut.h>            //the GLUT graphics library
 #endif
 
+// GLUI parameters and variables
+
+GLUI_RadioGroup *radio;
+int obj = 0;
+int   main_window;
+GLUI *glui_v_subwindow;
+int segments = 0;
+void control_cb( int control )
+{
+    /********************************************************************
+      Here we'll print the user id of the control that generated the
+      callback, and we'll also explicitly get the values of each control.
+      Note that we really didn't have to explicitly get the values, since
+      they are already all contained within the live variables:
+      'wireframe',  'segments',  'obj',  and 'text'
+      ********************************************************************/
+
+    printf( "callback: %d\n", control );
+    obj = (radio->get_int_val());
+    printf( "          radio group: %d\n", obj );
 
 
+}
 //--- SIMULATION PARAMETERS ------------------------------------------------------------------------
 const int DIM = 50;				//size of simulation grid
 double dt = 0.4;				//simulation time step
@@ -25,7 +47,6 @@ fftw_real *vx0, *vy0;           //(vx0,vy0) = velocity field at the previous mom
 fftw_real *fx, *fy;	            //(fx,fy)   = user-controlled simulation forces, steered with the mouse
 fftw_real *rho, *rho0;			//smoke density at the current (rho) and previous (rho0) moment
 rfftwnd_plan plan_rc, plan_cr;  //simulation domain discretization
-
 
 //--- VISUALIZATION PARAMETERS ---------------------------------------------------------------------
 int   winWidth, winHeight;      //size of the graphics window, in pixels
@@ -39,11 +60,12 @@ const int COLOR_BANDS=2;
 const int COLOR_HEATMAP=3;
 int   scalar_col = 0;           //method for scalar coloring
 int   frozen = 0;               //toggles on/off the animation
-int n_values = 5;
+int n_values = 0;
 int   legend_size = 50;
 
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
+
 
 //init_simulation: Initialize simulation data structures as a function of the grid size 'n'.
 //                 Although the simulation takes place on a 2D grid, we allocate all data structures as 1D arrays,
@@ -254,7 +276,7 @@ void heatmap(float value, float* R, float* G, float* B)
 void set_colormap(float vy)
 {
 	float R,G,B;
-
+    scalar_col = obj;
 	if (scalar_col==COLOR_BLACKWHITE)
 		R = G = B = vy;
 	else if (scalar_col==COLOR_RAINBOW)
@@ -277,7 +299,7 @@ void set_colormap(float vy)
 
 void draw_legend(void)
 {
-
+    n_values = segments;
     float R, G, B;
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 //    glBegin(GL_QUADS);
@@ -293,11 +315,12 @@ void draw_legend(void)
         float y1 = step*(j+1);
         float x1 = winWidth;
         heatmap(v, &R, &G, &B);
+        glColor3f(R,G,B);
 		glRecti(x0,y0,x1,y1);
 // R = 1; G = 0; B = 0;
 // color_test(j, &R, &G, &B);
 //Draw quad
-		  glColor3f(R,G,B);
+
 //        glVertex2f(x0, y0);
 //        glVertex2f(x1, y0);
 //        glVertex2f(x1, y1);
@@ -407,7 +430,17 @@ void visualize(void)
 	}
     draw_legend();
 }
-
+void UIHandler(){
+    if ( obj == 0 ) {
+        printf("it is rainbow");
+    }
+    else if ( obj == 1 ) {
+        printf("It is grey mode");
+    }
+    else if ( obj == 2 ) {
+        printf("colour mode");
+    }
+}
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
@@ -417,7 +450,9 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	visualize();
+    UIHandler();
+    visualize();
+
 	glFlush();
 	glutSwapBuffers();
 }
@@ -504,8 +539,6 @@ void drag(int mx, int my)
 	lmx = mx;
 	lmy = my;
 }
-
-
 //main: The main program
 int main(int argc, char **argv)
 {
@@ -525,14 +558,37 @@ int main(int argc, char **argv)
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
 	glutInitWindowSize(550,500);
-	glutCreateWindow("Real-time smoke simulation and visualization");
+    glutInitWindowPosition( 50, 50 );
+    main_window = glutCreateWindow("Real-time smoke simulation and visualization");
 	glutDisplayFunc(display);
-	glutReshapeFunc(reshape);
-	glutIdleFunc(do_one_simulation_step);
+
+    GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
 	glutKeyboardFunc(keyboard);
 	glutMotionFunc(drag);
 
+
+    //Testing UI stuff
+    //GLUI *glui = GLUI_Master.create_glui( "GLUI" );
+    GLUI *glui = glui_v_subwindow = GLUI_Master.create_glui_subwindow
+            (main_window, GLUI_SUBWINDOW_LEFT);
+    GLUI_Panel *obj_panel = new GLUI_Panel( glui, "Colour map type" );
+    radio = new GLUI_RadioGroup(obj_panel, (&obj), 4, control_cb);
+    new GLUI_RadioButton( radio, "Greyscale" );
+    new GLUI_RadioButton( radio, "Rainbow" );
+    new GLUI_RadioButton( radio, "something weird" );
+    new GLUI_RadioButton( radio, "Red-To-White" );
+    (new GLUI_Spinner( glui, "Number of colours", &segments ))
+            ->set_int_limits( 3, 60 );
+    new GLUI_Button( glui, "QUIT", 0,(GLUI_Update_CB)exit );
+    glui->set_main_gfx_window( main_window );
+    glutReshapeFunc(reshape);
+//    temp_foo = getFoo(5);
+//    type = *((int *)temp_foo);
+//    printf(":::%d:::",type);
+//    printString(temp_foo);
+
 	init_simulation(DIM);	//initialize the simulation data structures
+
 	glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
 	return 0;
 }
