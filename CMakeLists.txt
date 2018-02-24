@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.3)
 project(Scientific_Visualization)
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
-
+SET_SOURCE_FILES_PROPERTIES(fluids.c PROPERTIES LANGUAGE CXX )
 #add_custom_target(Scientific_Visualization COMMAND make -C ${Scientific_Visualization_SOURCE_DIR}
 #        CLION_EXE_DIR=${PROJECT_BINARY_DIR})
 
@@ -25,7 +23,7 @@ endif ()
 
 if (LINUX)
     message(STATUS "Linux environment detected")
-    set(LIBS glut GL GLU m rfftw fftw)
+    set(LIBS glui glut GL GLU m rfftw fftw)
     set(CMAKE_C_FLAGS "-O3 -march=x86-64 -mtune=generic -DNDEBUG -mfpmath=sse -ffast-math -Wall -pipe")
     add_definitions(-DLINUX)
 elseif(APPLE)
@@ -53,7 +51,8 @@ set(TESTS_SOURCES tests.c)
 add_executable(tests ${TESTS_SOURCES})
 target_link_libraries(tests ${LIBS})
 
-## Main target #########################################################################################################
-set(TESTS_SOURCES main.c)
-add_executable(main ${TESTS_SOURCES})
-target_link_libraries(main ${LIBS})
+## temp target #########################################################################################################
+set(TESTS_SOURCES UI.cpp)
+add_executable(UI ${TESTS_SOURCES})
+target_link_libraries(UI ${LIBS})
+
