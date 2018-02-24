@@ -3,12 +3,10 @@
 //--------------------------------------------------------------------------------------------------
 
 #include <rfftw.h>              //the numerical simulation FFTW library
-#include <stdio.h>              //for printing the help text
 #include <math.h>               //for various math functions
 #include "GL/glui.h"
 #ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
-#include "UI.h"
 #endif
 
 #ifdef MACOS
@@ -17,24 +15,18 @@
 
 // GLUI parameters and variables
 
-GLUI_RadioGroup *radio;
-int obj = 0;
+GLUI_RadioGroup *c_Map;
+GLUI_RadioGroup *dataset;
+int cMap = 0;
+int dSet = 0;
 int   main_window;
 GLUI *glui_v_subwindow;
 int segments = 0;
 void control_cb( int control )
 {
-    /********************************************************************
-      Here we'll print the user id of the control that generated the
-      callback, and we'll also explicitly get the values of each control.
-      Note that we really didn't have to explicitly get the values, since
-      they are already all contained within the live variables:
-      'wireframe',  'segments',  'obj',  and 'text'
-      ********************************************************************/
-
     printf( "callback: %d\n", control );
-    obj = (radio->get_int_val());
-    printf( "          radio group: %d\n", obj );
+    cMap = (c_Map->get_int_val());
+    printf( "          radio group: %d\n", cMap );
 
 
 }
@@ -276,7 +268,7 @@ void heatmap(float value, float* R, float* G, float* B)
 void set_colormap(float vy)
 {
 	float R,G,B;
-    scalar_col = obj;
+    scalar_col = cMap;
 	if (scalar_col==COLOR_BLACKWHITE)
 		R = G = B = vy;
 	else if (scalar_col==COLOR_RAINBOW)
@@ -430,17 +422,6 @@ void visualize(void)
 	}
     draw_legend();
 }
-void UIHandler(){
-    if ( obj == 0 ) {
-        printf("it is rainbow");
-    }
-    else if ( obj == 1 ) {
-        printf("It is grey mode");
-    }
-    else if ( obj == 2 ) {
-        printf("colour mode");
-    }
-}
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
@@ -450,7 +431,6 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-    UIHandler();
     visualize();
 
 	glFlush();
@@ -571,12 +551,19 @@ int main(int argc, char **argv)
     //GLUI *glui = GLUI_Master.create_glui( "GLUI" );
     GLUI *glui = glui_v_subwindow = GLUI_Master.create_glui_subwindow
             (main_window, GLUI_SUBWINDOW_LEFT);
-    GLUI_Panel *obj_panel = new GLUI_Panel( glui, "Colour map type" );
-    radio = new GLUI_RadioGroup(obj_panel, (&obj), 4, control_cb);
-    new GLUI_RadioButton( radio, "Greyscale" );
-    new GLUI_RadioButton( radio, "Rainbow" );
-    new GLUI_RadioButton( radio, "something weird" );
-    new GLUI_RadioButton( radio, "Red-To-White" );
+    GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
+    c_Map = new GLUI_RadioGroup(colormap_panel, (&cMap), 4, control_cb);
+    new GLUI_RadioButton( c_Map, "Greyscale" );
+    new GLUI_RadioButton( c_Map, "Rainbow" );
+    new GLUI_RadioButton( c_Map, "something weird" );
+    new GLUI_RadioButton( c_Map, "Red-To-White" );
+
+    GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
+    dataset = new GLUI_RadioGroup(dataset_panel, (&dSet), 4, control_cb);
+    new GLUI_RadioButton( dataset, "Density" );
+    new GLUI_RadioButton( dataset, "Velocity" );
+    new GLUI_RadioButton( dataset, "Force" );
+
     (new GLUI_Spinner( glui, "Number of colours", &segments ))
             ->set_int_limits( 3, 60 );
     new GLUI_Button( glui, "QUIT", 0,(GLUI_Update_CB)exit );
