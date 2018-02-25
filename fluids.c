@@ -4,7 +4,14 @@
 
 #include <rfftw.h>              //the numerical simulation FFTW library
 #include <math.h>               //for various math functions
+
 #include "GL/glui.h"
+
+#include <string.h>
+#include <float.h>
+#include <assert.h>
+
+
 #ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
 #endif
@@ -42,18 +49,33 @@ rfftwnd_plan plan_rc, plan_cr;  //simulation domain discretization
 
 //--- VISUALIZATION PARAMETERS ---------------------------------------------------------------------
 int   winWidth, winHeight;      //size of the graphics window, in pixels
+int   gridWidth, gridHeight;    //size of the simulation grid in pixels
 int   color_dir = 0;            //use direction color-coding or not
 float vec_scale = 1000;			//scaling of hedgehogs
-int   draw_smoke = 0;           //draw the smoke or not
-int   draw_vecs = 1;            //draw the vector field or not
+int   draw_smoke = 1;           //draw the smoke or not
+int   draw_vecs = 0;            //draw the vector field or not
 const int COLOR_BLACKWHITE=0;   //different types of color mapping: black-and-white, rainbow, banded
 const int COLOR_RAINBOW=1;
-const int COLOR_BANDS=2;
-const int COLOR_HEATMAP=3;
+const int COLOR_HEATMAP=2;
 int   scalar_col = 0;           //method for scalar coloring
 int   frozen = 0;               //toggles on/off the animation
+<<<<<<< HEAD
 int n_values = 0;
 int   legend_size = 50;
+=======
+int   n_colors = 256;           //number of colors used in the color map
+int   legend_size = 50;         //width of the legend
+int   legend_text_len = 100;
+const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
+const int DATASET_DENSITY=0;    //Density is the dataset to be displayed
+int   display_dataset = 0;      // The dataset to be displayed
+const int APPLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
+const int APPLY_CLAMP = 1;      //Use the clamping method for applying the color map to the dataset
+int apply_mode = 0;
+float clamp_min = 0.0f;
+float clamp_max = 1.0f;
+
+
 
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
@@ -264,47 +286,76 @@ void heatmap(float value, float* R, float* G, float* B)
     *G = max(0, 1 - fabs(value-3)) + max(0, 1 - fabs(value-4));
 }
 
+float conform_to_bands(float vy)
+{
+    vy *= n_colors;
+    vy = (int)(vy);
+    vy/= n_colors;
+    return vy;
+}
+
+fftw_real scale(fftw_real min, fftw_real max, fftw_real value)
+{
+    return (value - min)/(max-min);
+}
+
 //set_colormap: Sets different types of colormaps
 void set_colormap(float vy)
 {
 	float R,G,B;
+
     scalar_col = cMap;
 	if (scalar_col==COLOR_BLACKWHITE)
+
+
+    vy = conform_to_bands(vy);
+
+    if (scalar_col==COLOR_BLACKWHITE)
+
 		R = G = B = vy;
 	else if (scalar_col==COLOR_RAINBOW)
 		rainbow(vy,&R,&G,&B);
-	else if (scalar_col==COLOR_BANDS)
-	{
-		const int NLEVELS = 7;
-		vy *= NLEVELS;
-		vy = (int)(vy);
-		vy/= NLEVELS;
-		rainbow(vy,&R,&G,&B);
-	}
     else if (scalar_col==COLOR_HEATMAP)
-    {
         heatmap(vy, &R, &G, &B);
-    }
 
 	glColor3f(R,G,B);
 }
 
-void draw_legend(void)
+//draw text at x, y location
+void draw_text(const char* text, int x, int y)
 {
+    int len = strlen( text );
+
+    glColor3f( 1.0f, 1.0f, 1.0f );
+    glRasterPos2f( x, y );
+    for( int i = 0; i < len; i++ ) {
+        glutBitmapCharacter( GLUT_BITMAP_TIMES_ROMAN_24, text[i] );
+    }
+}
+
+void draw_legend(fftw_real min_v, fftw_real max_v)
+{
+
     n_values = segments;
     float R, G, B;
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 //    glBegin(GL_QUADS);
     float step = (float) winHeight / (float) n_values;
     for (int j = 0; j < n_values; ++j)
-    {
-//Normalise value (j) to [0,1]
 
-        float v = (float) j/((float) n_values);
+
+    float step = (float) winHeight / (float) n_colors;
+    for (int j = 0; j < n_colors; ++j)
+
+    {
+        //Normalise value (j) to [0,1]
+
+        float v = (float) j/((float) n_colors);
 
         float y0 = step*j;
-        float x0 = 500; //do not hardcode legend size
+        float x0 = winWidth-legend_size-legend_text_len; //do not hardcode legend size
         float y1 = step*(j+1);
+
         float x1 = winWidth;
         heatmap(v, &R, &G, &B);
         glColor3f(R,G,B);
@@ -317,8 +368,20 @@ void draw_legend(void)
 //        glVertex2f(x1, y0);
 //        glVertex2f(x1, y1);
 //        glVertex2f(x0, y1);
+
+        float x1 = winWidth-legend_text_len;
+
+        set_colormap(v);
+
+		glRecti(x0,y0,x1,y1);
+
+
     }
-    //glEnd();
+    char string[48];
+    snprintf (string, sizeof(string), "%f", min_v);
+    draw_text(string, winWidth-legend_text_len, 0);
+	snprintf (string, sizeof(string), "%f", max_v);
+    draw_text(string, winWidth-legend_text_len, winHeight-15);
 }
 
 //direction_to_color: Set the current color by mapping a direction vector (x,y), using
@@ -351,18 +414,65 @@ void direction_to_color(float x, float y, int method)
 	glColor3f(r,g,b);
 }
 
-//interpolate: apply better than stock interpolation for more accurate value of pixels between vertices
-void interpolate(void)
+//find_min_max: return the min and max values in a dataset
+void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset)
 {
+    *max_v = FLT_MIN;
+    *min_v = FLT_MAX;
+    for (int i = 0; i < DIM; ++i) {
+        if (dataset[i] < *min_v) *min_v = dataset[i];
+        if (dataset[i] > *max_v) *max_v = dataset[i];
+    }
 
+}
+
+//prepare_dataset: perform the required transformations in order to make dataset ready to display (clamping, scalling...)
+void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
+{
+    size_t dim = DIM * 2*(DIM/2+1);
+
+    assert(display_dataset == DATASET_DENSITY || display_dataset == DATASET_VELOCITY);
+
+    //Copy proper dataset source
+    if (display_dataset == DATASET_DENSITY)
+    {
+        dataset = memcpy(dataset, rho, dim * sizeof(rho));
+    }
+    else    //DATASET_VELOCITY
+    {
+        for (int i = 0; i < dim; ++i)
+            dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
+    }
+
+    //Apply transformation
+    if (apply_mode == APPLY_SCALING)    //Apply scaling
+    {
+        find_min_max(min_v, max_v, dataset);
+        for (int i = 0; i < dim; ++i)
+            dataset[i] = scale(*min_v, *max_v, dataset[i]);
+    }
+    else                                //Apply clamping
+    {
+        memcpy(dataset, rho, sizeof(rho)*dim);
+        for (int i = 0; i < dim; ++i)
+        {
+            dataset[i] = min(clamp_max, dataset[i]);
+            dataset[i] = max(clamp_min, dataset[i]);
+        }
+    }
 }
 
 //visualize: This is the main visualization function
 void visualize(void)
 {
 	int        i, j, idx;
-	fftw_real  wn = (fftw_real)winWidth / (fftw_real)(DIM + 1);   // Grid cell width
-	fftw_real  hn = (fftw_real)winHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
+	fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
+	fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
+
+    fftw_real min_v, max_v;
+    size_t dim = DIM * 2*(DIM/2+1);
+    fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
+    prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
 	if (draw_smoke)
 	{
@@ -393,15 +503,23 @@ void visualize(void)
 				py3 = hn + (fftw_real)j * hn;
 				idx3 = (j * DIM) + (i + 1);
 
+                fftw_real v0, v1, v2, v3;
 
-				set_colormap(rho[idx0]);    glVertex2f(px0, py0);
-				set_colormap(rho[idx1]);    glVertex2f(px1, py1);
-				set_colormap(rho[idx2]);    glVertex2f(px2, py2);
+                v0 = dataset[idx0];
+                v1 = dataset[idx1];
+                v2 = dataset[idx2];
+                v3 = dataset[idx3];
 
 
-				set_colormap(rho[idx0]);    glVertex2f(px0, py0);
-				set_colormap(rho[idx2]);    glVertex2f(px2, py2);
-				set_colormap(rho[idx3]);    glVertex2f(px3, py3);
+                set_colormap(v0);    glVertex2f(px0, py0);
+                set_colormap(v1);    glVertex2f(px1, py1);
+                set_colormap(v2);    glVertex2f(px2, py2);
+
+
+                set_colormap(v0);    glVertex2f(px0, py0);
+                set_colormap(v2);    glVertex2f(px2, py2);
+                set_colormap(v3);    glVertex2f(px3, py3);
+
 			}
 		}
 		glEnd();
@@ -420,7 +538,7 @@ void visualize(void)
 			}
 		glEnd();
 	}
-    draw_legend();
+    draw_legend(min_v, max_v);
 }
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
@@ -445,6 +563,8 @@ void reshape(int w, int h)
 	glLoadIdentity();
 	gluOrtho2D(0.0, (GLdouble)w, 0.0, (GLdouble)h);
 	winWidth = w; winHeight = h;
+    gridWidth = winWidth - legend_size - legend_text_len;
+    gridHeight = winHeight;
 }
 
 //keyboard: Handle key presses
@@ -455,10 +575,12 @@ void keyboard(unsigned char key, int x, int y)
 		case 't': dt -= 0.001; break;
 		case 'T': dt += 0.001; break;
 		case 'c': color_dir = 1 - color_dir; break;
+        case 'd': display_dataset = !display_dataset; break;
 		case 'S': vec_scale *= 1.2; break;
 		case 's': vec_scale *= 0.8; break;
 		case 'V': visc *= 5; break;
 		case 'v': visc *= 0.2; break;
+        case 'i': apply_mode = !apply_mode; break;
 		case 'x':
 			draw_smoke = 1 - draw_smoke;
 			if (draw_smoke==0) draw_vecs = 1;
@@ -473,6 +595,12 @@ void keyboard(unsigned char key, int x, int y)
 				scalar_col=COLOR_BLACKWHITE;
 			break;
 		case 'a': frozen = 1-frozen; break;
+        case '+': n_colors = min(256, n_colors+1); break;
+        case '-': n_colors = max(5, n_colors-1); break;
+        case '[': clamp_min = max(0, clamp_min-0.1f); break;
+        case ']': clamp_min = clamp_min+0.1f; break;
+        case '{': clamp_max = max(0, clamp_max-0.1f); break;
+        case '}': clamp_max = clamp_max+0.1f; break;
 		case 'q': exit(0);
 	}
 }
@@ -488,8 +616,8 @@ void drag(int mx, int my)
 	static int lmx=0,lmy=0;				//remembers last mouse location
 
 	// Compute the array index that corresponds to the cursor location
-	xi = (int)clamp((double)(DIM + 1) * ((double)mx / (double)winWidth));
-	yi = (int)clamp((double)(DIM + 1) * ((double)(winHeight - my) / (double)winHeight));
+	xi = (int)clamp((double)(DIM + 1) * ((double)mx / (double)gridWidth));
+	yi = (int)clamp((double)(DIM + 1) * ((double)(gridHeight - my) / (double)gridHeight));
 
 	X = xi;
 	Y = yi;
@@ -527,7 +655,12 @@ int main(int argc, char **argv)
 	printf("Click and drag the mouse to steer the flow!\n");
 	printf("T/t:   increase/decrease simulation timestep\n");
 	printf("S/s:   increase/decrease hedgehog scaling\n");
+    printf("+/-:   increase/decrease number of colors in color map\n");
+    printf("[/]:   increase/decrease min clamping limit\n");
+    printf("[/]:   increase/decrease max clamping limit\n");
 	printf("c:     toggle direction coloring on/off\n");
+    printf("d:     cycle through datasets\n");
+    printf("i:     toggle application method of the color map\n");
 	printf("V/v:   increase decrease fluid viscosity\n");
 	printf("x:     toggle drawing matter on/off\n");
 	printf("y:     toggle drawing hedgehogs on/off\n");
@@ -537,9 +670,14 @@ int main(int argc, char **argv)
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
+
 	glutInitWindowSize(550,500);
     glutInitWindowPosition( 50, 50 );
     main_window = glutCreateWindow("Real-time smoke simulation and visualization");
+
+	glutInitWindowSize(650,500);
+	glutCreateWindow("Real-time smoke simulation and visualization");
+
 	glutDisplayFunc(display);
 
     GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
