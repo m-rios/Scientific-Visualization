@@ -7,6 +7,7 @@
 #include <math.h>               //for various math functions
 #include <string.h>
 #include <float.h>
+#include <assert.h>
 
 #ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
@@ -46,10 +47,12 @@ int   legend_size = 50;         //width of the legend
 int   legend_text_len = 100;
 const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
 const int DATASET_DENSITY=0;    //Density is the dataset to be displayed
-int   dataset = 0;              // The dataset to be displayed
-const int APLLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
+int   display_dataset = 0;      // The dataset to be displayed
+const int APPLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
 const int APPLY_CLAMP = 1;      //Use the clamping method for applying the color map to the dataset
 int apply_mode = 0;
+float clamp_min = 0.0f;
+float clamp_max = 1.0f;
 
 
 
@@ -371,6 +374,42 @@ void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset)
 
 }
 
+//prepare_dataset: perform the required transformations in order to make dataset ready to display (clamping, scalling...)
+void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
+{
+    size_t dim = DIM * 2*(DIM/2+1);
+
+    assert(display_dataset == DATASET_DENSITY || display_dataset == DATASET_VELOCITY);
+
+    //Copy proper dataset source
+    if (display_dataset == DATASET_DENSITY)
+    {
+        dataset = memcpy(dataset, rho, dim * sizeof(rho));
+    }
+    else    //DATASET_VELOCITY
+    {
+        for (int i = 0; i < dim; ++i)
+            dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
+    }
+
+    //Apply transformation
+    if (apply_mode == APPLY_SCALING)    //Apply scaling
+    {
+        find_min_max(min_v, max_v, dataset);
+        for (int i = 0; i < dim; ++i)
+            dataset[i] = scale(*min_v, *max_v, dataset[i]);
+    }
+    else                                //Apply clamping
+    {
+        memcpy(dataset, rho, sizeof(rho)*dim);
+        for (int i = 0; i < dim; ++i)
+        {
+            dataset[i] = min(clamp_max, dataset[i]);
+            dataset[i] = max(clamp_min, dataset[i]);
+        }
+    }
+}
+
 //visualize: This is the main visualization function
 void visualize(void)
 {
@@ -378,8 +417,10 @@ void visualize(void)
 	fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
 	fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
 
-    fftw_real rho_min, rho_max;
-    find_min_max(&rho_min, &rho_max, rho);
+    fftw_real min_v, max_v;
+    size_t dim = DIM * 2*(DIM/2+1);
+    fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
+    prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
 	if (draw_smoke)
 	{
@@ -412,21 +453,10 @@ void visualize(void)
 
                 fftw_real v0, v1, v2, v3;
 
-                if (dataset == DATASET_DENSITY)
-                {
-                    v0 = scale(rho_min, rho_max, rho[idx0]);
-                    v1 = scale(rho_min, rho_max, rho[idx1]);
-                    v2 = scale(rho_min, rho_max, rho[idx2]);
-                    v3 = scale(rho_min, rho_max, rho[idx3]);
-                }
-                else if (dataset == DATASET_VELOCITY)
-                {
-                    v0 = sqrt(pow(vx[idx0],2) + pow(vy[idx0],2)) * 30;
-                    v1 = sqrt(pow(vx[idx1],2) + pow(vy[idx1],2))* 30;
-                    v2 = sqrt(pow(vx[idx2],2) + pow(vy[idx2],2)) * 30;
-                    v3 = sqrt(pow(vx[idx3],2) + pow(vy[idx3],2)) * 30;
-                }
-
+                v0 = dataset[idx0];
+                v1 = dataset[idx1];
+                v2 = dataset[idx2];
+                v3 = dataset[idx3];
 
 
                 set_colormap(v0);    glVertex2f(px0, py0);
@@ -456,7 +486,7 @@ void visualize(void)
 			}
 		glEnd();
 	}
-    draw_legend(rho_min, rho_max);
+    draw_legend(min_v, max_v);
 }
 
 
@@ -493,7 +523,7 @@ void keyboard(unsigned char key, int x, int y)
 		case 't': dt -= 0.001; break;
 		case 'T': dt += 0.001; break;
 		case 'c': color_dir = 1 - color_dir; break;
-        case 'd': dataset = !dataset; break;
+        case 'd': display_dataset = !display_dataset; break;
 		case 'S': vec_scale *= 1.2; break;
 		case 's': vec_scale *= 0.8; break;
 		case 'V': visc *= 5; break;
@@ -515,6 +545,10 @@ void keyboard(unsigned char key, int x, int y)
 		case 'a': frozen = 1-frozen; break;
         case '+': n_colors = min(256, n_colors+1); break;
         case '-': n_colors = max(5, n_colors-1); break;
+        case '[': clamp_min = max(0, clamp_min-0.1f); break;
+        case ']': clamp_min = clamp_min+0.1f; break;
+        case '{': clamp_max = max(0, clamp_max-0.1f); break;
+        case '}': clamp_max = clamp_max+0.1f; break;
 		case 'q': exit(0);
 	}
 }
@@ -572,6 +606,8 @@ int main(int argc, char **argv)
 	printf("T/t:   increase/decrease simulation timestep\n");
 	printf("S/s:   increase/decrease hedgehog scaling\n");
     printf("+/-:   increase/decrease number of colors in color map\n");
+    printf("[/]:   increase/decrease min clamping limit\n");
+    printf("[/]:   increase/decrease max clamping limit\n");
 	printf("c:     toggle direction coloring on/off\n");
     printf("d:     cycle through datasets\n");
     printf("i:     toggle application method of the color map\n");
