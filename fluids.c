@@ -59,12 +59,12 @@ const int COLOR_RAINBOW=1;
 const int COLOR_HEATMAP=2;
 int   scalar_col = 0;           //method for scalar coloring
 int   frozen = 0;               //toggles on/off the animation
-<<<<<<< HEAD
+
 int n_values = 0;
 int   legend_size = 50;
-=======
+
 int   n_colors = 256;           //number of colors used in the color map
-int   legend_size = 50;         //width of the legend
+
 int   legend_text_len = 100;
 const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
 const int DATASET_DENSITY=0;    //Density is the dataset to be displayed
@@ -369,7 +369,7 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
 //        glVertex2f(x1, y1);
 //        glVertex2f(x0, y1);
 
-        float x1 = winWidth-legend_text_len;
+        x1 = winWidth-legend_text_len;
 
         set_colormap(v);
 
@@ -436,7 +436,7 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
     //Copy proper dataset source
     if (display_dataset == DATASET_DENSITY)
     {
-        dataset = memcpy(dataset, rho, dim * sizeof(rho));
+        dataset = static_cast<fftw_real *>(memcpy(dataset, rho, dim * sizeof(rho)));
     }
     else    //DATASET_VELOCITY
     {
@@ -675,8 +675,6 @@ int main(int argc, char **argv)
     glutInitWindowPosition( 50, 50 );
     main_window = glutCreateWindow("Real-time smoke simulation and visualization");
 
-	glutInitWindowSize(650,500);
-	glutCreateWindow("Real-time smoke simulation and visualization");
 
 	glutDisplayFunc(display);
 
