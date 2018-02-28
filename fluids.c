@@ -20,23 +20,7 @@
 #include <GLUT/glut.h>            //the GLUT graphics library
 #endif
 
-// GLUI parameters and variables
 
-GLUI_RadioGroup *c_Map;
-GLUI_RadioGroup *dataset;
-int cMap = 0;
-int dSet = 0;
-int   main_window;
-GLUI *glui_v_subwindow;
-int segments = 0;
-void control_cb( int control )
-{
-    printf( "callback: %d\n", control );
-    cMap = (c_Map->get_int_val());
-    printf( "          radio group: %d\n", cMap );
-
-
-}
 //--- SIMULATION PARAMETERS ------------------------------------------------------------------------
 const int DIM = 50;				//size of simulation grid
 double dt = 0.4;				//simulation time step
@@ -75,7 +59,13 @@ int apply_mode = 0;
 float clamp_min = 0.0f;
 float clamp_max = 1.0f;
 
-
+//--- GLUI PARAMETERS ------------------------------------------------------------------------------
+GLUI_RadioGroup *c_Map;
+GLUI_RadioGroup *dataset;
+int dSet = 0;
+int   main_window;
+GLUI *glui_v_subwindow;
+int segments = 0;
 
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
@@ -304,7 +294,6 @@ void set_colormap(float vy)
 {
 	float R,G,B;
 
-    scalar_col = cMap;
 	if (scalar_col==COLOR_BLACKWHITE)
 
 
@@ -336,17 +325,8 @@ void draw_text(const char* text, int x, int y)
 void draw_legend(fftw_real min_v, fftw_real max_v)
 {
 
-    n_values = segments;
-    float R, G, B;
-//    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-//    glBegin(GL_QUADS);
-    float step = (float) winHeight / (float) n_values;
-    for (int j = 0; j < n_values; ++j)
-
-
     float step = (float) winHeight / (float) n_colors;
     for (int j = 0; j < n_colors; ++j)
-
     {
         //Normalise value (j) to [0,1]
 
@@ -355,32 +335,17 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
         float y0 = step*j;
         float x0 = winWidth-legend_size-legend_text_len; //do not hardcode legend size
         float y1 = step*(j+1);
-
-        float x1 = winWidth;
-        heatmap(v, &R, &G, &B);
-        glColor3f(R,G,B);
-		glRecti(x0,y0,x1,y1);
-// R = 1; G = 0; B = 0;
-// color_test(j, &R, &G, &B);
-//Draw quad
-
-//        glVertex2f(x0, y0);
-//        glVertex2f(x1, y0);
-//        glVertex2f(x1, y1);
-//        glVertex2f(x0, y1);
-
-        x1 = winWidth-legend_text_len;
+        float x1 = winWidth-legend_text_len;
 
         set_colormap(v);
 
-		glRecti(x0,y0,x1,y1);
-
+        glRecti(x0,y0,x1,y1);
 
     }
     char string[48];
     snprintf (string, sizeof(string), "%f", min_v);
     draw_text(string, winWidth-legend_text_len, 0);
-	snprintf (string, sizeof(string), "%f", max_v);
+    snprintf (string, sizeof(string), "%f", max_v);
     draw_text(string, winWidth-legend_text_len, winHeight-15);
 }
 
@@ -541,6 +506,17 @@ void visualize(void)
     draw_legend(min_v, max_v);
 }
 
+//------ GLUI CODE STARTS HERE ------------------------------------------------------------------------
+
+void control_cb( int control )
+{
+    printf( "callback: %d\n", control );
+    scalar_col = (c_Map->get_int_val());
+    printf( "          radio group: %d\n", scalar_col );
+
+
+}
+
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
 //display: Handle window redrawing events. Simply delegates to visualize().
@@ -671,7 +647,7 @@ int main(int argc, char **argv)
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
 
-	glutInitWindowSize(550,500);
+	glutInitWindowSize(750,500);
     glutInitWindowPosition( 50, 50 );
     main_window = glutCreateWindow("Real-time smoke simulation and visualization");
 
@@ -683,32 +659,33 @@ int main(int argc, char **argv)
 	glutMotionFunc(drag);
 
 
+
     //Testing UI stuff
     //GLUI *glui = GLUI_Master.create_glui( "GLUI" );
-    GLUI *glui = glui_v_subwindow = GLUI_Master.create_glui_subwindow
-            (main_window, GLUI_SUBWINDOW_LEFT);
-    GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
-    c_Map = new GLUI_RadioGroup(colormap_panel, (&cMap), 4, control_cb);
-    new GLUI_RadioButton( c_Map, "Greyscale" );
-    new GLUI_RadioButton( c_Map, "Rainbow" );
-    new GLUI_RadioButton( c_Map, "something weird" );
-    new GLUI_RadioButton( c_Map, "Red-To-White" );
-
-    GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
-    dataset = new GLUI_RadioGroup(dataset_panel, (&dSet), 4, control_cb);
-    new GLUI_RadioButton( dataset, "Density" );
-    new GLUI_RadioButton( dataset, "Velocity" );
-    new GLUI_RadioButton( dataset, "Force" );
-
-    (new GLUI_Spinner( glui, "Number of colours", &segments ))
-            ->set_int_limits( 3, 60 );
-    new GLUI_Button( glui, "QUIT", 0,(GLUI_Update_CB)exit );
-    glui->set_main_gfx_window( main_window );
-    glutReshapeFunc(reshape);
+//    GLUI *glui = glui_v_subwindow = GLUI_Master.create_glui_subwindow
+//            (main_window, GLUI_SUBWINDOW_LEFT);
+//    GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
+//    c_Map = new GLUI_RadioGroup(colormap_panel, (&scalar_col), 4, control_cb);
+//    new GLUI_RadioButton( c_Map, "Greyscale" );
+//    new GLUI_RadioButton( c_Map, "Rainbow" );
+//    new GLUI_RadioButton( c_Map, "Red-To-White" );
+//
+//    GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
+//    dataset = new GLUI_RadioGroup(dataset_panel, (&dSet), 4, control_cb);
+//    new GLUI_RadioButton( dataset, "Density" );
+//    new GLUI_RadioButton( dataset, "Velocity" );
+//    new GLUI_RadioButton( dataset, "Force" );
+//
+//    (new GLUI_Spinner( glui, "Number of colours", &n_colors ))
+//            ->set_int_limits( 3, 256 );
+//    new GLUI_Button( glui, "QUIT", 0,(GLUI_Update_CB)exit );
+//    glui->set_main_gfx_window( main_window );
 //    temp_foo = getFoo(5);
 //    type = *((int *)temp_foo);
 //    printf(":::%d:::",type);
 //    printString(temp_foo);
+
+    glutReshapeFunc(reshape);
 
 	init_simulation(DIM);	//initialize the simulation data structures
 
