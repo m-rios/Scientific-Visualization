@@ -7,7 +7,6 @@
 
 #include "GL/glui.h"
 
-#include <string.h>
 #include <float.h>
 #include <assert.h>
 
@@ -50,14 +49,17 @@ int   legend_size = 50;
 int   n_colors = 256;           //number of colors used in the color map
 
 int   legend_text_len = 100;
-const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
 const int DATASET_DENSITY=0;    //Density is the dataset to be displayed
+const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
+const int DATASET_FORCE=2;    //Density is the dataset to be displayed
 int   display_dataset = 0;      // The dataset to be displayed
 const int APPLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
 const int APPLY_CLAMP = 1;      //Use the clamping method for applying the color map to the dataset
 int apply_mode = 0;
 float clamp_min = 0.0f;
 float clamp_max = 1.0f;
+unsigned int	textureID[3];
+int texture_mapping = 0;
 
 //--- GLUI PARAMETERS ------------------------------------------------------------------------------
 GLUI_RadioGroup *c_Map;
@@ -66,7 +68,11 @@ int dSet = 0;
 int   main_window;
 GLUI *glui_v_subwindow;
 int segments = 0;
-
+GLUI_Spinner *clamp_max_spinner;
+GLUI_Spinner *clamp_min_spinner;
+GLUI *glui;
+const int RADIO_COLOR_MAP = 0;
+const int RADIO_DATASET = 1;
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
 
@@ -93,6 +99,11 @@ void init_simulation(int n)
 
 	for (i = 0; i < n * n; i++)                      //Initialize data structures to 0
 	{ vx[i] = vy[i] = vx0[i] = vy0[i] = fx[i] = fy[i] = rho[i] = rho0[i] = 0.0f; }
+}
+
+void reset_simulation(void)
+{
+    init_simulation(DIM);
 }
 
 
@@ -234,6 +245,7 @@ void do_one_simulation_step(void)
 {
 	if (!frozen)
 	{
+        if ( glutGetWindow() != main_window ) glutSetWindow(main_window);
 		set_forces();
 		solve(DIM, vx, vy, vx0, vy0, visc, dt);
 		diffuse_matter(DIM, vx, vy, rho, rho0, dt);
@@ -295,19 +307,29 @@ void set_colormap(float vy)
 	float R,G,B;
 
 	if (scalar_col==COLOR_BLACKWHITE)
-
-
-    vy = conform_to_bands(vy);
-
-    if (scalar_col==COLOR_BLACKWHITE)
-
-		R = G = B = vy;
+    {
+        vy = conform_to_bands(vy);
+        R = G = B = vy;
+    }
 	else if (scalar_col==COLOR_RAINBOW)
 		rainbow(vy,&R,&G,&B);
     else if (scalar_col==COLOR_HEATMAP)
         heatmap(vy, &R, &G, &B);
 
 	glColor3f(R,G,B);
+}
+
+void get_colormap(float vy, float *R, float *G, float *B)
+{
+    if (scalar_col==COLOR_BLACKWHITE)
+    {
+        vy = conform_to_bands(vy);
+        *R = *G = *B = vy;
+    }
+    else if (scalar_col==COLOR_RAINBOW)
+        rainbow(vy,R,G,B);
+    else if (scalar_col==COLOR_HEATMAP)
+        heatmap(vy, R, G, B);
 }
 
 //draw text at x, y location
@@ -385,8 +407,8 @@ void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset)
     *max_v = FLT_MIN;
     *min_v = FLT_MAX;
     for (int i = 0; i < DIM; ++i) {
-        if (dataset[i] < *min_v) *min_v = dataset[i];
-        if (dataset[i] > *max_v) *max_v = dataset[i];
+        if (dataset[i] <= *min_v) *min_v = dataset[i];
+        if (dataset[i] >= *max_v) *max_v = dataset[i];
     }
 
 }
@@ -401,7 +423,9 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
     //Copy proper dataset source
     if (display_dataset == DATASET_DENSITY)
     {
-        dataset = static_cast<fftw_real *>(memcpy(dataset, rho, dim * sizeof(rho)));
+//        dataset = static_cast<fftw_real *>(memcpy(dataset, rho, dim * sizeof(rho)));
+        for (int i = 0; i < dim; ++i)
+            dataset[i] = rho[i];
     }
     else    //DATASET_VELOCITY
     {
@@ -423,8 +447,24 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
         {
             dataset[i] = min(clamp_max, dataset[i]);
             dataset[i] = max(clamp_min, dataset[i]);
+            dataset[i] = scale(clamp_min, clamp_max, dataset[i]);
         }
     }
+}
+
+void setup_texture()
+{
+    glDisable(GL_LIGHTING);
+//    glShadeModel(GL_SMOOTH);							//2.   Use bilinear interpolation when drawing cells as polygons
+
+    glEnable(GL_TEXTURE_1D);							//3.   Activate OpenGL's 1D texture mapping. Use the 1D-texture corresponding
+    //     to the currently-active colormap.
+    glBindTexture(GL_TEXTURE_1D,textureID[scalar_col]);
+    glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
 }
 
 //visualize: This is the main visualization function
@@ -441,6 +481,8 @@ void visualize(void)
 
 	if (draw_smoke)
 	{
+        if (texture_mapping) setup_texture();
+
 		int idx0, idx1, idx2, idx3;
 		double px0, py0, px1, py1, px2, py2, px3, py3;
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -475,18 +517,29 @@ void visualize(void)
                 v2 = dataset[idx2];
                 v3 = dataset[idx3];
 
+                if (!texture_mapping)
+                {
+                    set_colormap(v0);    glVertex2f(px0, py0);
+                    set_colormap(v1);    glVertex2f(px1, py1);
+                    set_colormap(v2);    glVertex2f(px2, py2);
 
-                set_colormap(v0);    glVertex2f(px0, py0);
-                set_colormap(v1);    glVertex2f(px1, py1);
-                set_colormap(v2);    glVertex2f(px2, py2);
 
+                    set_colormap(v0);    glVertex2f(px0, py0);
+                    set_colormap(v2);    glVertex2f(px2, py2);
+                    set_colormap(v3);    glVertex2f(px3, py3);
+                } else
+                {
+                    glTexCoord1f(v0);    glVertex2f(px0,py0);
+                    glTexCoord1f(v1);    glVertex2f(px1,py1);
+                    glTexCoord1f(v2);    glVertex2f(px2,py2);
 
-                set_colormap(v0);    glVertex2f(px0, py0);
-                set_colormap(v2);    glVertex2f(px2, py2);
-                set_colormap(v3);    glVertex2f(px3, py3);
-
+                    glTexCoord1f(v0);    glVertex2f(px0,py0);
+                    glTexCoord1f(v2);    glVertex2f(px2,py2);
+                    glTexCoord1f(v3);    glVertex2f(px3,py3);
+                }
 			}
 		}
+        if (texture_mapping) glDisable(GL_TEXTURE_1D);							//6.   Done with using 1D textures
 		glEnd();
 	}
 
@@ -506,15 +559,50 @@ void visualize(void)
     draw_legend(min_v, max_v);
 }
 
+void create_textures()					//Create one 1D texture for each of the available colormaps.
+{														//We will next use these textures to color map scalar data.
+
+    glGenTextures(3,textureID);							//Generate 3 texture names, for the textures we will create
+    glPixelStorei(GL_UNPACK_ALIGNMENT,1);				//Make sure that OpenGL will understand our CPU-side texture storage format
+
+    for(int i=COLOR_BLACKWHITE;i<=COLOR_HEATMAP;++i)
+    {													//Generate all three textures:
+        glBindTexture(GL_TEXTURE_1D,textureID[i]);		//Make i-th texture active (for setting it)
+        const int size = 3;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
+        float textureImage[3*size];
+
+        scalar_col = i;				//Activate the i-th colormap
+
+        for(int j=0;j<size;++j)							//Generate all 'size' RGB texels for the current texture:
+        {
+            float v = float(j)/(size-1);				//Compute a scalar value in [0,1]
+            float R,G,B;
+            get_colormap(v, &R, &G, &B);						//Map this scalar value to a color, using the current colormap
+
+            textureImage[3*j]   = R;					//Store the color for this scalar value in the texture
+            textureImage[3*j+1] = G;
+            textureImage[3*j+2] = B;
+        }
+        glTexImage1D(GL_TEXTURE_1D,0,GL_RGB,size,0,GL_RGB,GL_FLOAT,textureImage);
+        //The texture is ready - pass it to OpenGL
+    }
+
+    scalar_col = 0;					//Reset the currently-active colormap to the default (first one)
+}
+
 //------ GLUI CODE STARTS HERE ------------------------------------------------------------------------
 
-void control_cb( int control )
+void radio_cb( int control )
 {
-    printf( "callback: %d\n", control );
-    scalar_col = (c_Map->get_int_val());
-    printf( "          radio group: %d\n", scalar_col );
 
-
+    if (control == RADIO_COLOR_MAP)
+    {
+        scalar_col = c_Map->get_int_val();
+    }
+    else if (control == RADIO_DATASET)
+    {
+        display_dataset = dataset->get_int_val();
+    }
 }
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
@@ -573,12 +661,13 @@ void keyboard(unsigned char key, int x, int y)
 		case 'a': frozen = 1-frozen; break;
         case '+': n_colors = min(256, n_colors+1); break;
         case '-': n_colors = max(5, n_colors-1); break;
-        case '[': clamp_min = max(0, clamp_min-0.1f); break;
-        case ']': clamp_min = clamp_min+0.1f; break;
-        case '{': clamp_max = max(0, clamp_max-0.1f); break;
-        case '}': clamp_max = clamp_max+0.1f; break;
+        case '[': clamp_min_spinner->set_float_val(max(0, clamp_min-0.1f)); break;
+        case ']': clamp_min_spinner->set_float_val(clamp_min+0.1f); break;
+        case '{': clamp_max_spinner->set_float_val(max(0, clamp_max-0.1f)); break;
+        case '}': clamp_max_spinner->set_float_val(clamp_max+0.1f); break;
 		case 'q': exit(0);
 	}
+    glui->sync_live(); //Synchronise live variables to update keyboard changes in gui.
 }
 
 
@@ -644,51 +733,68 @@ int main(int argc, char **argv)
 	printf("a:     toggle the animation on/off\n");
 	printf("q:     quit\n\n");
 
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-
 	glutInitWindowSize(750,500);
     glutInitWindowPosition( 50, 50 );
+
+
     main_window = glutCreateWindow("Real-time smoke simulation and visualization");
-
-
 	glutDisplayFunc(display);
-
-    GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
 	glutKeyboardFunc(keyboard);
 	glutMotionFunc(drag);
-
-
-
-    //Testing UI stuff
-    //GLUI *glui = GLUI_Master.create_glui( "GLUI" );
-//    GLUI *glui = glui_v_subwindow = GLUI_Master.create_glui_subwindow
-//            (main_window, GLUI_SUBWINDOW_LEFT);
-//    GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
-//    c_Map = new GLUI_RadioGroup(colormap_panel, (&scalar_col), 4, control_cb);
-//    new GLUI_RadioButton( c_Map, "Greyscale" );
-//    new GLUI_RadioButton( c_Map, "Rainbow" );
-//    new GLUI_RadioButton( c_Map, "Red-To-White" );
-//
-//    GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
-//    dataset = new GLUI_RadioGroup(dataset_panel, (&dSet), 4, control_cb);
-//    new GLUI_RadioButton( dataset, "Density" );
-//    new GLUI_RadioButton( dataset, "Velocity" );
-//    new GLUI_RadioButton( dataset, "Force" );
-//
-//    (new GLUI_Spinner( glui, "Number of colours", &n_colors ))
-//            ->set_int_limits( 3, 256 );
-//    new GLUI_Button( glui, "QUIT", 0,(GLUI_Update_CB)exit );
-//    glui->set_main_gfx_window( main_window );
-//    temp_foo = getFoo(5);
-//    type = *((int *)temp_foo);
-//    printf(":::%d:::",type);
-//    printString(temp_foo);
-
     glutReshapeFunc(reshape);
 
+
+    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
+
+
+    GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
+    c_Map = new GLUI_RadioGroup(colormap_panel, (&scalar_col), RADIO_COLOR_MAP, radio_cb);
+    new GLUI_RadioButton( c_Map, "Greyscale" );
+    new GLUI_RadioButton( c_Map, "Rainbow" );
+    new GLUI_RadioButton( c_Map, "Heatmap" );
+
+    GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
+    dataset = new GLUI_RadioGroup(dataset_panel, (&dSet), RADIO_DATASET, radio_cb);
+    new GLUI_RadioButton( dataset, "Density" );
+    new GLUI_RadioButton( dataset, "Velocity" );
+    new GLUI_RadioButton( dataset, "Force" );
+
+    GLUI_Panel *clamping_panel = new GLUI_Panel( glui, "Clamping options" );
+    glui->add_checkbox_to_panel(clamping_panel, "Apply clamping", &apply_mode);
+    clamp_max_spinner = glui->add_spinner_to_panel(clamping_panel, "Clamp max", GLUI_SPINNER_FLOAT, &clamp_max);
+    clamp_min_spinner = glui->add_spinner_to_panel(clamping_panel, "Clamp min", GLUI_SPINNER_FLOAT, &clamp_min);
+    clamp_max_spinner->set_int_limits(0, 1);
+    clamp_min_spinner->set_int_limits(0, 1);
+    clamp_max_spinner->set_float_val(1.0f);
+    clamp_min_spinner->set_float_val(0.0f);
+
+    glui->add_checkbox("Use texture mapping", &texture_mapping);
+
+    printf("Clamp max initial value: %f",clamp_max);
+
+    (new GLUI_Spinner( glui, "Number of colours", &n_colors ))->set_int_limits( 3, 256 );
+
+    glui->add_button("Reset", -1, (GLUI_Update_CB) reset_simulation);
+
+    new GLUI_Button( glui, "QUIT", 0,(GLUI_Update_CB)exit );
+
+
+    glui->set_main_gfx_window( main_window );
+    GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
+
+
 	init_simulation(DIM);	//initialize the simulation data structures
+    create_textures();
 
 	glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
 	return 0;
 }
+
+//TODO:
+//
+//- texture color mapping from book example.
+//- check equation 5.1, maybe clamping and scalling can be implemented directly by colormap function using the formula, the
+//    only difference is the input of the min/max values (dataset determined for scaling, user for clamping).
