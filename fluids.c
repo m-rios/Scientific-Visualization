@@ -51,7 +51,7 @@ int   n_colors = 256;           //number of colors used in the color map
 int   legend_text_len = 100;
 const int DATASET_DENSITY=0;    //Density is the dataset to be displayed
 const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
-const int DATASET_FORCE=2;    //Density is the dataset to be displayed
+const int DATASET_FORCE=2;      //Force is the dataset to be displayed
 int   display_dataset = 0;      // The dataset to be displayed
 const int APPLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
 const int APPLY_CLAMP = 1;      //Use the clamping method for applying the color map to the dataset
@@ -62,9 +62,13 @@ unsigned int	textureID[3];
 int texture_mapping = 0;
 
 //--- GLUI PARAMETERS ------------------------------------------------------------------------------
-GLUI_RadioGroup *c_Map;
-GLUI_RadioGroup *dataset;
-int dSet = 0;
+GLUI_RadioGroup *colormap_radio;
+GLUI_RadioGroup *dataset_radio;
+GLUI_RadioGroup *glyph_radio;
+GLUI_Button *button;
+int sGlyph = 0;
+int vGlyph = 0;
+bool glyph = false;
 int   main_window;
 GLUI *glui_v_subwindow;
 int segments = 0;
@@ -73,6 +77,7 @@ GLUI_Spinner *clamp_min_spinner;
 GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
+const int RADIO_GLYPH = 2;
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
 
@@ -371,11 +376,13 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
     draw_text(string, winWidth-legend_text_len, winHeight-15);
 }
 
+
 //direction_to_color: Set the current color by mapping a direction vector (x,y), using
 //                    the color mapping method 'method'. If method==1, map the vector direction
 //                    using a rainbow colormap. If method==0, simply use the white color
 void direction_to_color(float x, float y, int method)
 {
+
 	float r,g,b,f;
 	if (method)
 	{
@@ -418,7 +425,7 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
 {
     size_t dim = DIM * 2*(DIM/2+1);
 
-    assert(display_dataset == DATASET_DENSITY || display_dataset == DATASET_VELOCITY);
+    assert(display_dataset == DATASET_DENSITY || display_dataset == DATASET_VELOCITY || display_dataset == DATASET_FORCE);
 
     //Copy proper dataset source
     if (display_dataset == DATASET_DENSITY)
@@ -430,7 +437,11 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
         for (int i = 0; i < dim; ++i)
             dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
     }
-
+    else if (display_dataset == DATASET_FORCE)
+    {
+        for (int i = 0; i < dim; ++i)
+            dataset[i] = sqrt(pow(fx[i],2) + pow(fy[i],2));
+    }
     //Apply transformation
     if (apply_mode == APPLY_SCALING)    //Apply scaling
     {
@@ -554,13 +565,40 @@ void visualize(void)
 	if (draw_vecs)
 	{
 		glBegin(GL_LINES);				//draw velocities
+
 		for (i = 0; i < DIM; i++)
 			for (j = 0; j < DIM; j++)
 			{
 				idx = (j * DIM) + i;
 				direction_to_color(vx[idx],vy[idx],color_dir);
-				glVertex2f(wn + (fftw_real)i * wn, hn + (fftw_real)j * hn);
-				glVertex2f((wn + (fftw_real)i * wn) + vec_scale * vx[idx], (hn + (fftw_real)j * hn) + vec_scale * vy[idx]);
+                //mapping the scalar value of the dataset with color.
+                if (glyph)
+                {//User selects glyphs options
+                    set_colormap(dataset[idx]);
+                    //todo calculate the magnitude of all vectors and substitute with vec_scale
+                    if (vGlyph == 0)//fluid velocity
+                    {
+                        //(3.1415927 / 180.0) * angle;
+                        double magV = sqrt(pow(vx[idx],2) + pow(vy[idx],2));
+                        double angleV = atan2(vx[idx],vy[idx]);
+                        glVertex2f(wn + (fftw_real)i * wn, hn + (fftw_real)j * hn);
+                        glVertex2f((wn + (fftw_real)i * wn) +  vec_scale * cos(angleV) * magV, (hn + (fftw_real)j * hn) + vec_scale *sin(angleV) * magV);
+                    }
+
+                    if (vGlyph == 1)//force
+                    {
+                        double magF = sqrt(pow(fx[idx],2) + pow(fy[idx],2));
+                        double angleF = atan2(fx[idx],fy[idx]);
+                        glVertex2f(wn + (fftw_real)i * wn, hn + (fftw_real)j * hn);
+                        glVertex2f((wn + (fftw_real)i * wn) + 500 * cos(angleF) * magF, (hn + (fftw_real)j * hn) + 500 * sin(angleF) * magF);
+                    }
+                }  else {
+                    glVertex2f(wn + (fftw_real)i * wn, hn + (fftw_real)j * hn);
+                    glVertex2f((wn + (fftw_real)i * wn) + vec_scale * vx[idx], (hn + (fftw_real)j * hn) + vec_scale * vy[idx]);
+                }
+
+
+
 			}
 		glEnd();
 	}
@@ -602,14 +640,11 @@ void create_textures(int n_colors)					//Create one 1D texture for each of the a
 
 void radio_cb( int control )
 {
-
-    if (control == RADIO_COLOR_MAP)
+    switch (control)
     {
-        scalar_col = c_Map->get_int_val();
-    }
-    else if (control == RADIO_DATASET)
-    {
-        display_dataset = dataset->get_int_val();
+        case RADIO_COLOR_MAP:   scalar_col = colormap_radio->get_int_val();         break;
+        case RADIO_DATASET:     display_dataset = dataset_radio->get_int_val();     break;
+        case RADIO_GLYPH:       vGlyph = (glyph_radio->get_int_val());              break;
     }
 }
 
@@ -618,6 +653,17 @@ void color_bands_cb(int control)
     create_textures(n_colors);
 }
 
+void glyph_button_cb(int control)
+{
+  printf( "callback: %d\n", control );
+  glyph = true;
+  if (glyph)
+  {
+   printf("Glyph view enabled");
+  } else {
+   printf ("Glyph view disabled");
+  }
+}
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
 //display: Handle window redrawing events. Simply delegates to visualize().
@@ -762,18 +808,31 @@ int main(int argc, char **argv)
 
     glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
 
-
+    
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
-    c_Map = new GLUI_RadioGroup(colormap_panel, (&scalar_col), RADIO_COLOR_MAP, radio_cb);
-    new GLUI_RadioButton( c_Map, "Greyscale" );
-    new GLUI_RadioButton( c_Map, "Rainbow" );
-    new GLUI_RadioButton( c_Map, "Heatmap" );
+    colormap_radio = new GLUI_RadioGroup(colormap_panel, (&scalar_col), RADIO_COLOR_MAP, radio_cb);
+    new GLUI_RadioButton( colormap_radio, "Greyscale" );
+    new GLUI_RadioButton( colormap_radio, "Rainbow" );
+    new GLUI_RadioButton( colormap_radio, "Heatmap" );
 
     GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
-    dataset = new GLUI_RadioGroup(dataset_panel, (&dSet), RADIO_DATASET, radio_cb);
-    new GLUI_RadioButton( dataset, "Density" );
-    new GLUI_RadioButton( dataset, "Velocity" );
-    new GLUI_RadioButton( dataset, "Force" );
+    dataset_radio = new GLUI_RadioGroup(dataset_panel, (&display_dataset), RADIO_DATASET, radio_cb);
+    new GLUI_RadioButton( dataset_radio, "Density" );
+    new GLUI_RadioButton( dataset_radio, "Velocity" );
+    new GLUI_RadioButton( dataset_radio, "Force" );
+
+    button = new GLUI_Button(glui, "View Glyphs", 5, glyph_button_cb);
+//    GLUI_Panel *glyphscalar_panel = new GLUI_Panel( glui, "scalar value for glyph" );
+//    glyph_radio = new GLUI_RadioGroup(glyphscalar_panel, (&sGlyph), 4, control_cb);
+//    new GLUI_RadioButton( glyph_radio, "rho" );
+//    new GLUI_RadioButton( glyph_radio, "||v||" );
+//    new GLUI_RadioButton( glyph_radio, "||f||" );
+
+    GLUI_Panel *glyphvector_panel = new GLUI_Panel( glui, "vector value for glyph" );
+    glyph_radio = new GLUI_RadioGroup(glyphvector_panel , (&vGlyph), RADIO_GLYPH, radio_cb);
+    new GLUI_RadioButton( glyph_radio, "fluid velocity" );
+    new GLUI_RadioButton( glyph_radio, "force" );
+
 
     GLUI_Panel *clamping_panel = new GLUI_Panel( glui, "Clamping options" );
     glui->add_checkbox_to_panel(clamping_panel, "Apply clamping", &apply_mode);
