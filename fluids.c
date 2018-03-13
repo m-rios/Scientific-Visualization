@@ -423,11 +423,9 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
     //Copy proper dataset source
     if (display_dataset == DATASET_DENSITY)
     {
-//        dataset = static_cast<fftw_real *>(memcpy(dataset, rho, dim * sizeof(rho)));
-        for (int i = 0; i < dim; ++i)
-            dataset[i] = rho[i];
+        memcpy(dataset, rho, dim * sizeof(rho));
     }
-    else    //DATASET_VELOCITY
+    else if (display_dataset == DATASET_VELOCITY)
     {
         for (int i = 0; i < dim; ++i)
             dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
@@ -455,7 +453,7 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
 void setup_texture()
 {
     glDisable(GL_LIGHTING);
-//    glShadeModel(GL_SMOOTH);							//2.   Use bilinear interpolation when drawing cells as polygons
+    glShadeModel(GL_SMOOTH);							//2.   Use bilinear interpolation when drawing cells as polygons
 
     glEnable(GL_TEXTURE_1D);							//3.   Activate OpenGL's 1D texture mapping. Use the 1D-texture corresponding
     //     to the currently-active colormap.
@@ -465,6 +463,11 @@ void setup_texture()
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
+}
+
+int value_to_index(fftw_real v)
+{
+    return (int) floor(v*n_colors);
 }
 
 //visualize: This is the main visualization function
@@ -481,12 +484,11 @@ void visualize(void)
 
 	if (draw_smoke)
 	{
-        if (texture_mapping) setup_texture();
-
-		int idx0, idx1, idx2, idx3;
+        int idx0, idx1, idx2, idx3;
 		double px0, py0, px1, py1, px2, py2, px3, py3;
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glBegin(GL_TRIANGLES);
+        if (texture_mapping) setup_texture();
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glBegin(GL_TRIANGLES);
 		for (j = 0; j < DIM - 1; j++)            //draw smoke
 		{
 			for (i = 0; i < DIM - 1; i++)
@@ -529,19 +531,25 @@ void visualize(void)
                     set_colormap(v3);    glVertex2f(px3, py3);
                 } else
                 {
-                    glTexCoord1f(v0);    glVertex2f(px0,py0);
-                    glTexCoord1f(v1);    glVertex2f(px1,py1);
-                    glTexCoord1f(v2);    glVertex2f(px2,py2);
+//                    printf("%d\t%d\t%d\t%d\n", value_to_index(v0), value_to_index(v1), value_to_index(v2), value_to_index(v3));
+                    assert(value_to_index(v0) <= n_colors && value_to_index(v0 >= 0));
+                    assert(value_to_index(v1) <= n_colors && value_to_index(v1 >= 0));
+                    assert(value_to_index(v2) <= n_colors && value_to_index(v2 >= 0));
+                    assert(value_to_index(v3) <= n_colors && value_to_index(v3 >= 0));
 
-                    glTexCoord1f(v0);    glVertex2f(px0,py0);
-                    glTexCoord1f(v2);    glVertex2f(px2,py2);
-                    glTexCoord1f(v3);    glVertex2f(px3,py3);
+//                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
+//                    glTexCoord1f(value_to_index(v1));    glVertex2f(px1,py1);
+//                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
+//
+//                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
+//                    glTexCoord1f(value_to_index(v3));    glVertex2f(px3,py3);
+//                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
                 }
 			}
 		}
-        if (texture_mapping) glDisable(GL_TEXTURE_1D);							//6.   Done with using 1D textures
 		glEnd();
-	}
+        if (texture_mapping) glDisable(GL_TEXTURE_1D);							//6.   Done with using 1D textures
+    }
 
 	if (draw_vecs)
 	{
@@ -559,7 +567,7 @@ void visualize(void)
     draw_legend(min_v, max_v);
 }
 
-void create_textures()					//Create one 1D texture for each of the available colormaps.
+void create_textures(int n_colors)					//Create one 1D texture for each of the available colormaps.
 {														//We will next use these textures to color map scalar data.
 
     glGenTextures(3,textureID);							//Generate 3 texture names, for the textures we will create
@@ -568,7 +576,7 @@ void create_textures()					//Create one 1D texture for each of the available col
     for(int i=COLOR_BLACKWHITE;i<=COLOR_HEATMAP;++i)
     {													//Generate all three textures:
         glBindTexture(GL_TEXTURE_1D,textureID[i]);		//Make i-th texture active (for setting it)
-        const int size = 3;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
+        const int size = 256;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
         float textureImage[3*size];
 
         scalar_col = i;				//Activate the i-th colormap
@@ -603,6 +611,11 @@ void radio_cb( int control )
     {
         display_dataset = dataset->get_int_val();
     }
+}
+
+void color_bands_cb(int control)
+{
+    create_textures(n_colors);
 }
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
@@ -775,7 +788,9 @@ int main(int argc, char **argv)
 
     printf("Clamp max initial value: %f",clamp_max);
 
-    (new GLUI_Spinner( glui, "Number of colours", &n_colors ))->set_int_limits( 3, 256 );
+//    (new GLUI_Spinner( glui, "Number of colours", &n_colors ))->set_int_limits( 3, 256 );
+    GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &n_colors, -1, color_bands_cb);
+    color_bands_spinner->set_int_limits(3, 256);
 
     glui->add_button("Reset", -1, (GLUI_Update_CB) reset_simulation);
 
@@ -787,7 +802,7 @@ int main(int argc, char **argv)
 
 
 	init_simulation(DIM);	//initialize the simulation data structures
-    create_textures();
+    create_textures(n_colors);
 
 	glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
 	return 0;
