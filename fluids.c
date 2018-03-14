@@ -55,7 +55,8 @@ const int DATASET_FORCE=2;      //Force is the dataset to be displayed
 int   display_dataset = 0;      // The dataset to be displayed
 const int APPLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
 const int APPLY_CLAMP = 1;      //Use the clamping method for applying the color map to the dataset
-int apply_mode = 0;
+const int APPLY_NO_SCALING = 2;       //Do not use dynamic scaling (default behaviour from the skeleton code)
+int apply_mode = 2;
 float clamp_min = 0.0f;
 float clamp_max = 1.0f;
 unsigned int	textureID[3];
@@ -449,7 +450,7 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
         for (int i = 0; i < dim; ++i)
             dataset[i] = scale(*min_v, *max_v, dataset[i]);
     }
-    else                                //Apply clamping
+    else if (apply_mode == APPLY_CLAMP) //Apply clamping
     {
         memcpy(dataset, rho, sizeof(rho)*dim);
         for (int i = 0; i < dim; ++i)
@@ -548,13 +549,13 @@ void visualize(void)
                     assert(value_to_index(v2) <= n_colors && value_to_index(v2 >= 0));
                     assert(value_to_index(v3) <= n_colors && value_to_index(v3 >= 0));
 
-//                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
-//                    glTexCoord1f(value_to_index(v1));    glVertex2f(px1,py1);
-//                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
-//
-//                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
-//                    glTexCoord1f(value_to_index(v3));    glVertex2f(px3,py3);
-//                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
+                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
+                    glTexCoord1f(value_to_index(v1));    glVertex2f(px1,py1);
+                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
+
+                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
+                    glTexCoord1f(value_to_index(v3));    glVertex2f(px3,py3);
+                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
                 }
 			}
 		}
@@ -664,6 +665,21 @@ void glyph_button_cb(int control)
    printf ("Glyph view disabled");
   }
 }
+
+void apply_checkbox_cb(int control)
+{
+    const int CHECKBOX_APPLY_NO_SCALING = 0;
+    switch (control)
+    {
+        case CHECKBOX_APPLY_NO_SCALING:
+            if (apply_mode == APPLY_NO_SCALING)
+                apply_mode = APPLY_SCALING;
+            else
+                apply_mode = APPLY_NO_SCALING;
+            break;
+    }
+}
+
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
 //display: Handle window redrawing events. Simply delegates to visualize().
@@ -844,6 +860,7 @@ int main(int argc, char **argv)
     clamp_min_spinner->set_float_val(0.0f);
 
     glui->add_checkbox("Use texture mapping", &texture_mapping);
+    glui->add_checkbox("Disable dynamic scaling", NULL, 0, apply_checkbox_cb);
 
     printf("Clamp max initial value: %f",clamp_max);
 
