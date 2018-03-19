@@ -61,6 +61,8 @@ float clamp_min = 0.0f;
 float clamp_max = 1.0f;
 unsigned int	textureID[3];
 int texture_mapping = 0;
+int display_divergence = 0;
+int dynamic_scalling = 0;
 
 //--- GLUI PARAMETERS ------------------------------------------------------------------------------
 GLUI_RadioGroup *colormap_radio;
@@ -430,7 +432,23 @@ void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset)
 //compute_divergence: computes from the x,y vector field the divergence and assigns it to dataset
 void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
 {
+    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
+    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
 
+    for (int j = 0; j < DIM - 1; j++)
+    {
+        for (int i = 0; i < DIM - 1; i++)
+		{
+//            double px = wn + (fftw_real) i * wn;
+//            double py = hn + (fftw_real) j * hn;
+
+			int idx1 = ((j + 1) * DIM) + i;
+			int idx3 = (j * DIM) + (i + 1);
+
+            int idx0 = (j * DIM) + i;
+			dataset[idx0] = (x[idx0+i] - x[idx0]) + (y[idx0+DIM] - y[idx0]);	//Divergence operator
+        }
+    }
 }
 
 //prepare_dataset: perform the required transformations in order to make dataset ready to display (clamping, scalling...)
@@ -447,24 +465,39 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
     }
     else if (display_dataset == DATASET_VELOCITY)
     {
-        for (int i = 0; i < dim; ++i)
-            dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
+		if (display_divergence)
+		{
+			compute_divergence(vx, vy, dataset);
+		}
+		else
+		{
+			for (int i = 0; i < dim; ++i)
+				dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
+		}
     }
     else if (display_dataset == DATASET_FORCE)
     {
-        for (int i = 0; i < dim; ++i)
-            dataset[i] = sqrt(pow(fx[i],2) + pow(fy[i],2));
+		if (display_divergence)
+		{
+			compute_divergence(fx, fy, dataset);
+		}
+		else
+		{
+			for (int i = 0; i < dim; ++i)
+				dataset[i] = sqrt(pow(fx[i],2) + pow(fy[i],2));
+		}
     }
+
     //Apply transformation
     if (apply_mode == APPLY_SCALING)    //Apply scaling
     {
+		if (!dynamic_scalling) return;
         find_min_max(min_v, max_v, dataset);
         for (int i = 0; i < dim; ++i)
             dataset[i] = scale(*min_v, *max_v, dataset[i]);
     }
     else if (apply_mode == APPLY_CLAMP) //Apply clamping
     {
-        memcpy(dataset, rho, sizeof(rho)*dim);
         for (int i = 0; i < dim; ++i)
         {
             dataset[i] = min(clamp_max, dataset[i]);
@@ -924,7 +957,8 @@ int main(int argc, char **argv)
     clamp_min_spinner->set_float_val(0.0f);
 
     glui->add_checkbox("Use texture mapping", &texture_mapping);
-    glui->add_checkbox("Disable dynamic scaling", NULL, 0, apply_checkbox_cb);
+    glui->add_checkbox("Disable dynamic scaling", &dynamic_scalling);
+	glui->add_checkbox("Show divergence", &display_divergence);
 
     printf("Clamp max initial value: %f",clamp_max);
 
