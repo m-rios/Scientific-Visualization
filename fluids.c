@@ -55,8 +55,7 @@ const int DATASET_FORCE=2;      //Force is the dataset to be displayed
 int   display_dataset = 0;      // The dataset to be displayed
 const int APPLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
 const int APPLY_CLAMP = 1;      //Use the clamping method for applying the color map to the dataset
-const int APPLY_NO_SCALING = 2;       //Do not use dynamic scaling (default behaviour from the skeleton code)
-int apply_mode = 2;
+int apply_mode = 1;
 float clamp_min = 0.0f;
 float clamp_max = 1.0f;
 unsigned int	textureID[3];
@@ -757,20 +756,6 @@ void glyph_button_cb(int control)
   } else {
    printf ("Glyph view disabled");
   }
-}
-
-void apply_checkbox_cb(int control)
-{
-    const int CHECKBOX_APPLY_NO_SCALING = 0;
-    switch (control)
-    {
-        case CHECKBOX_APPLY_NO_SCALING:
-            if (apply_mode == APPLY_NO_SCALING)
-                apply_mode = APPLY_SCALING;
-            else
-                apply_mode = APPLY_NO_SCALING;
-            break;
-    }
 }
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
