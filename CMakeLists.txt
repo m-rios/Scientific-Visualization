@@ -7,8 +7,8 @@ SET_SOURCE_FILES_PROPERTIES(fluids.c PROPERTIES LANGUAGE CXX )
 
 
 # Add common dependencies for macOS and Linux ##########################################################################
-include_directories(${PROJECT_SOURCE_DIR}/fftw-2.1.5/include)
-link_directories(${PROJECT_SOURCE_DIR}/fftw-2.1.5/lib)
+include_directories(${PROJECT_SOURCE_DIR}/fftw-2.1.5/include $ENV{HOME}/.local/include)
+link_directories(${PROJECT_SOURCE_DIR}/fftw-2.1.5/lib $ENV{HOME}/.local/lib)
 
 file(GLOB CPP_FILES src/*.cpp)
 file(GLOB HEADER_FILES src/*.h)
@@ -50,9 +50,3 @@ target_link_libraries(smoke ${LIBS})
 set(TESTS_SOURCES tests.c)
 add_executable(tests ${TESTS_SOURCES})
 target_link_libraries(tests ${LIBS})
-
-## temp target #########################################################################################################
-set(TESTS_SOURCES UI.cpp)
-add_executable(UI ${TESTS_SOURCES})
-target_link_libraries(UI ${LIBS})
-

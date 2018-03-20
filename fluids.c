@@ -55,11 +55,13 @@ const int DATASET_FORCE=2;      //Force is the dataset to be displayed
 int   display_dataset = 0;      // The dataset to be displayed
 const int APPLY_SCALING = 0;    //Use the scaling method to apply the color map to the dataset
 const int APPLY_CLAMP = 1;      //Use the clamping method for applying the color map to the dataset
-int apply_mode = 0;
+int apply_mode = 1;
 float clamp_min = 0.0f;
 float clamp_max = 1.0f;
 unsigned int	textureID[3];
-int texture_mapping = 0;
+int texture_mapping = 1;
+int display_divergence = 0;
+int dynamic_scalling = 0;
 
 //--- GLUI PARAMETERS ------------------------------------------------------------------------------
 GLUI_RadioGroup *colormap_radio;
@@ -300,7 +302,7 @@ float conform_to_bands(float vy)
 {
     vy *= n_colors;
     vy = (int)(vy);
-    vy/= n_colors;
+    vy/= n_colors-1;
     return vy;
 }
 
@@ -313,12 +315,9 @@ fftw_real scale(fftw_real min, fftw_real max, fftw_real value)
 void set_colormap(float vy)
 {
 	float R,G,B;
-
+    vy = conform_to_bands(vy);
 	if (scalar_col==COLOR_BLACKWHITE)
-    {
-        vy = conform_to_bands(vy);
         R = G = B = vy;
-    }
 	else if (scalar_col==COLOR_RAINBOW)
 		rainbow(vy,&R,&G,&B);
     else if (scalar_col==COLOR_HEATMAP)
@@ -329,11 +328,9 @@ void set_colormap(float vy)
 
 void get_colormap(float vy, float *R, float *G, float *B)
 {
+    vy = conform_to_bands(vy);
     if (scalar_col==COLOR_BLACKWHITE)
-    {
-        vy = conform_to_bands(vy);
         *R = *G = *B = vy;
-    }
     else if (scalar_col==COLOR_RAINBOW)
         rainbow(vy,R,G,B);
     else if (scalar_col==COLOR_HEATMAP)
@@ -355,22 +352,33 @@ void draw_text(const char* text, int x, int y)
 void draw_legend(fftw_real min_v, fftw_real max_v)
 {
     float step = (float) winHeight / (float) n_colors;
+
+    if (texture_mapping) glEnable(GL_TEXTURE_1D);
+
     for (int j = 0; j < n_colors; ++j)
     {
         //Normalise value (j) to [0,1]
 
-        float v = (float) j/((float) n_colors);
+        float v = (float) j/((float) (n_colors-1));
 
         float y0 = step*j;
         float x0 = winWidth-legend_size-legend_text_len; //do not hardcode legend size
         float y1 = step*(j+1);
         float x1 = winWidth-legend_text_len;
 
-        set_colormap(v);
+        if (texture_mapping)
+        {
+            glTexCoord1f(v);
+        }
+        else
+        {
+            set_colormap(v);
+        }
 
         glRecti(x0,y0,x1,y1);
 
     }
+    if (texture_mapping) glDisable(GL_TEXTURE_1D);
     char string[48];
     snprintf (string, sizeof(string), "%f", min_v);
     draw_text(string, winWidth-legend_text_len, 0);
@@ -422,6 +430,24 @@ void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset)
 
 }
 
+//compute_divergence: computes from the x,y vector field the divergence and assigns it to dataset
+void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
+{
+    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
+    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
+    for (int j = 0; j < DIM - 1; j++)
+    {
+        for (int i = 0; i < DIM - 1; i++)
+		{
+            int next_x = (j * DIM) + (i + 1); //next in x
+            int next_y = ((j + 1) * DIM) + i; //next cell in y
+
+            int current = (j * DIM) + i;
+			dataset[current] = (x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn;	//Divergence operator
+        }
+    }
+}
+
 //prepare_dataset: perform the required transformations in order to make dataset ready to display (clamping, scalling...)
 void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
 {
@@ -436,24 +462,39 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
     }
     else if (display_dataset == DATASET_VELOCITY)
     {
-        for (int i = 0; i < dim; ++i)
-            dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
+		if (display_divergence)
+		{
+			compute_divergence(vx, vy, dataset);
+		}
+		else
+		{
+			for (int i = 0; i < dim; ++i)
+				dataset[i] = sqrt(pow(vx[i],2) + pow(vy[i],2));
+		}
     }
     else if (display_dataset == DATASET_FORCE)
     {
-        for (int i = 0; i < dim; ++i)
-            dataset[i] = sqrt(pow(fx[i],2) + pow(fy[i],2));
+		if (display_divergence)
+		{
+			compute_divergence(fx, fy, dataset);
+		}
+		else
+		{
+			for (int i = 0; i < dim; ++i)
+				dataset[i] = sqrt(pow(fx[i],2) + pow(fy[i],2));
+		}
     }
+
     //Apply transformation
     if (apply_mode == APPLY_SCALING)    //Apply scaling
     {
+		if (!dynamic_scalling) return;
         find_min_max(min_v, max_v, dataset);
         for (int i = 0; i < dim; ++i)
             dataset[i] = scale(*min_v, *max_v, dataset[i]);
     }
-    else                                //Apply clamping
+    else if (apply_mode == APPLY_CLAMP) //Apply clamping
     {
-        memcpy(dataset, rho, sizeof(rho)*dim);
         for (int i = 0; i < dim; ++i)
         {
             dataset[i] = min(clamp_max, dataset[i]);
@@ -463,12 +504,13 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
     }
 }
 
-void setup_texture()
+void draw_smoke_textures(void)
 {
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glDisable(GL_LIGHTING);
-    glShadeModel(GL_SMOOTH);							//2.   Use bilinear interpolation when drawing cells as polygons
+    glShadeModel(GL_SMOOTH);
 
-    glEnable(GL_TEXTURE_1D);							//3.   Activate OpenGL's 1D texture mapping. Use the 1D-texture corresponding
+    glEnable(GL_TEXTURE_1D);
     //     to the currently-active colormap.
     glBindTexture(GL_TEXTURE_1D,textureID[scalar_col]);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -476,11 +518,123 @@ void setup_texture()
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
+
+    int idx;
+    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
+    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
+
+    fftw_real min_v, max_v;
+    size_t dim = DIM * 2*(DIM/2+1);
+    fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
+    prepare_dataset(dataset, &min_v, &max_v);
+
+    int idx0, idx1, idx2, idx3;
+    double px0, py0, px1, py1, px2, py2, px3, py3;
+    glBegin(GL_TRIANGLES);
+    for (int j = 0; j < DIM - 1; j++)
+    {
+        for (int i = 0; i < DIM - 1; i++)
+        {
+
+            px0 = wn + (fftw_real)i * wn;
+            py0 = hn + (fftw_real)j * hn;
+            idx0 = (j * DIM) + i;
+
+
+            px1 = wn + (fftw_real)i * wn;
+            py1 = hn + (fftw_real)(j + 1) * hn;
+            idx1 = ((j + 1) * DIM) + i;
+
+
+            px2 = wn + (fftw_real)(i + 1) * wn;
+            py2 = hn + (fftw_real)(j + 1) * hn;
+            idx2 = ((j + 1) * DIM) + (i + 1);
+
+
+            px3 = wn + (fftw_real)(i + 1) * wn;
+            py3 = hn + (fftw_real)j * hn;
+            idx3 = (j * DIM) + (i + 1);
+
+            fftw_real v0, v1, v2, v3;
+
+            v0 = dataset[idx0];
+            v1 = dataset[idx1];
+            v2 = dataset[idx2];
+            v3 = dataset[idx3];
+
+            glTexCoord1f(v0);    glVertex2f(px0,py0);
+            glTexCoord1f(v1);    glVertex2f(px1,py1);
+            glTexCoord1f(v2);    glVertex2f(px2,py2);
+//            glTexCoord1f(v3);    glVertex2f(px3,py3);
+
+            glTexCoord1f(v0);    glVertex2f(px0,py0);
+            glTexCoord1f(v3);    glVertex2f(px3,py3);
+            glTexCoord1f(v2);    glVertex2f(px2,py2);
+
+        }
+    }
+    glEnd();
+    glDisable(GL_TEXTURE_1D);
+    draw_legend(min_v, max_v);
 }
 
-int value_to_index(fftw_real v)
+void draw_smoke_default()
 {
-    return (int) floor(v*n_colors);
+    int        i, j, idx;
+    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
+    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
+
+    fftw_real min_v, max_v;
+    size_t dim = DIM * 2*(DIM/2+1);
+    fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
+    prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
+
+    int idx0, idx1, idx2, idx3;
+    double px0, py0, px1, py1, px2, py2, px3, py3;
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glBegin(GL_TRIANGLES);
+    for (j = 0; j < DIM - 1; j++)            //draw smoke
+    {
+        for (i = 0; i < DIM - 1; i++)
+        {
+            px0 = wn + (fftw_real)i * wn;
+            py0 = hn + (fftw_real)j * hn;
+            idx0 = (j * DIM) + i;
+
+
+            px1 = wn + (fftw_real)i * wn;
+            py1 = hn + (fftw_real)(j + 1) * hn;
+            idx1 = ((j + 1) * DIM) + i;
+
+
+            px2 = wn + (fftw_real)(i + 1) * wn;
+            py2 = hn + (fftw_real)(j + 1) * hn;
+            idx2 = ((j + 1) * DIM) + (i + 1);
+
+
+            px3 = wn + (fftw_real)(i + 1) * wn;
+            py3 = hn + (fftw_real)j * hn;
+            idx3 = (j * DIM) + (i + 1);
+
+            fftw_real v0, v1, v2, v3;
+
+            v0 = dataset[idx0];
+            v1 = dataset[idx1];
+            v2 = dataset[idx2];
+            v3 = dataset[idx3];
+
+            set_colormap(v0);    glVertex2f(px0, py0);
+            set_colormap(v1);    glVertex2f(px1, py1);
+            set_colormap(v2);    glVertex2f(px2, py2);
+
+
+            set_colormap(v0);    glVertex2f(px0, py0);
+            set_colormap(v2);    glVertex2f(px2, py2);
+            set_colormap(v3);    glVertex2f(px3, py3);
+        }
+    }
+    glEnd();
+    draw_legend(min_v, max_v);
 }
 
 //visualize: This is the main visualization function
@@ -489,78 +643,19 @@ void visualize(void)
 	int        i, j, idx;
 	fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
 	fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
+
     fftw_real min_v, max_v;
     size_t dim = DIM * 2*(DIM/2+1);
     fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
+
 	if (draw_smoke)
 	{
-        int idx0, idx1, idx2, idx3;
-		double px0, py0, px1, py1, px2, py2, px3, py3;
-        if (texture_mapping) setup_texture();
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glBegin(GL_TRIANGLES);
-		for (j = 0; j < DIM - 1; j++)            //draw smoke
-		{
-			for (i = 0; i < DIM - 1; i++)
-			{
-				px0 = wn + (fftw_real)i * wn;
-				py0 = hn + (fftw_real)j * hn;
-				idx0 = (j * DIM) + i;
-
-
-				px1 = wn + (fftw_real)i * wn;
-				py1 = hn + (fftw_real)(j + 1) * hn;
-				idx1 = ((j + 1) * DIM) + i;
-
-
-				px2 = wn + (fftw_real)(i + 1) * wn;
-				py2 = hn + (fftw_real)(j + 1) * hn;
-				idx2 = ((j + 1) * DIM) + (i + 1);
-
-
-				px3 = wn + (fftw_real)(i + 1) * wn;
-				py3 = hn + (fftw_real)j * hn;
-				idx3 = (j * DIM) + (i + 1);
-
-                fftw_real v0, v1, v2, v3;
-
-                v0 = dataset[idx0];
-                v1 = dataset[idx1];
-                v2 = dataset[idx2];
-                v3 = dataset[idx3];
-
-                if (!texture_mapping)
-                {
-                    set_colormap(v0);    glVertex2f(px0, py0);
-                    set_colormap(v1);    glVertex2f(px1, py1);
-                    set_colormap(v2);    glVertex2f(px2, py2);
-
-
-                    set_colormap(v0);    glVertex2f(px0, py0);
-                    set_colormap(v2);    glVertex2f(px2, py2);
-                    set_colormap(v3);    glVertex2f(px3, py3);
-                } else
-                {
-//                    printf("%d\t%d\t%d\t%d\n", value_to_index(v0), value_to_index(v1), value_to_index(v2), value_to_index(v3));
-                    assert(value_to_index(v0) <= n_colors && value_to_index(v0 >= 0));
-                    assert(value_to_index(v1) <= n_colors && value_to_index(v1 >= 0));
-                    assert(value_to_index(v2) <= n_colors && value_to_index(v2 >= 0));
-                    assert(value_to_index(v3) <= n_colors && value_to_index(v3 >= 0));
-
-//                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
-//                    glTexCoord1f(value_to_index(v1));    glVertex2f(px1,py1);
-//                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
-//
-//                    glTexCoord1f(value_to_index(v0));    glVertex2f(px0,py0);
-//                    glTexCoord1f(value_to_index(v3));    glVertex2f(px3,py3);
-//                    glTexCoord1f(value_to_index(v2));    glVertex2f(px2,py2);
-                }
-			}
-		}
-		glEnd();
-        if (texture_mapping) glDisable(GL_TEXTURE_1D);							//6.   Done with using 1D textures
+        if (texture_mapping)
+            draw_smoke_textures();
+        else
+            draw_smoke_default();
     }
 
 	if (draw_vecs)
@@ -653,16 +748,18 @@ void visualize(void)
     draw_legend(min_v, max_v);
 }
 
-void create_textures(int n_colors)					//Create one 1D texture for each of the available colormaps.
+void create_textures()					//Create one 1D texture for each of the available colormaps.
 {														//We will next use these textures to color map scalar data.
 
     glGenTextures(3,textureID);							//Generate 3 texture names, for the textures we will create
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);				//Make sure that OpenGL will understand our CPU-side texture storage format
 
+    int selected_map = scalar_col;
+
     for(int i=COLOR_BLACKWHITE;i<=COLOR_HEATMAP;++i)
     {													//Generate all three textures:
         glBindTexture(GL_TEXTURE_1D,textureID[i]);		//Make i-th texture active (for setting it)
-        const int size = 256;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
+        const int size = 512;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
         float textureImage[3*size];
 
         scalar_col = i;				//Activate the i-th colormap
@@ -681,7 +778,7 @@ void create_textures(int n_colors)					//Create one 1D texture for each of the a
         //The texture is ready - pass it to OpenGL
     }
 
-    scalar_col = 0;					//Reset the currently-active colormap to the default (first one)
+    scalar_col = selected_map;					//Reset the currently-active colormap to the default (first one)
 }
 
 //------ GLUI CODE STARTS HERE ------------------------------------------------------------------------
@@ -698,7 +795,7 @@ void radio_cb( int control )
 
 void color_bands_cb(int control)
 {
-    create_textures(n_colors);
+    create_textures();
 }
 
 void glyph_button_cb(int control)
@@ -911,6 +1008,8 @@ int main(int argc, char **argv)
     clamp_min_spinner->set_float_val(0.0f);
 
     glui->add_checkbox("Use texture mapping", &texture_mapping);
+    glui->add_checkbox("Dynamic scaling", &dynamic_scalling);
+	glui->add_checkbox("Show divergence", &display_divergence);
 
     printf("Clamp max initial value: %f",clamp_max);
 
@@ -928,7 +1027,7 @@ int main(int argc, char **argv)
 
 
 	init_simulation(DIM);	//initialize the simulation data structures
-    create_textures(n_colors);
+    create_textures();
 
 	glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
 	return 0;
