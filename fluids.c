@@ -696,26 +696,25 @@ void visualize(void)
 				}
 			}
 			glEnd();
-		}
+        }
         else if (typeGlyph == 1) //Conical glyph section
         {
-            for (i = 0; i < DIM ; i++) {
-                for (j = 0; j < DIM; j++) {
+            for (j = 0; j < DIM; j++) {
+                for (i = 0; i < DIM ; i++) {
                     idx = (j * DIM) + i;
                     set_colormap(dataset[idx]); //applying colourmapping
                     if (vGlyph == 0)//fluid velocity
                     {
-                        //(3.1415927 / 180.0) * angle;
-
                         double magV = sqrt(pow(vx[idx], 2) + pow(vy[idx], 2));
                         double angleV = atan2(vx[idx], vy[idx]);
                         double deg = angleV *(180/3.1415927);
-                        glTranslatef(0.0, hn, 0.0);
+                        glTranslatef(i*wn, j*hn, -5.0);
                         //todo:rotation based on the direction
-                        glRotatef(deg,  0.0, 1.0, 0.0);
+                        glRotatef(90,  0.0, 1.0, 0.0);
                         glRotatef(-deg, 1.0, 0.0, 0.0);
                         //glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
-                        glutSolidCone(magV * 200, magV * 200, 20, 20);
+                        glutSolidCone(10.0, magV * 200, 20, 20);
+                        glLoadIdentity();
                     } else if (vGlyph == 1) // force
                     {
                         double magF = sqrt(pow(fx[idx], 2) + pow(fy[idx], 2));
@@ -725,11 +724,9 @@ void visualize(void)
                         glTranslatef(0.0,hn, 0.0);
                     }
                 }
-                glTranslatef(0.0, -(hn*j), 0.0);
-                glTranslatef(wn,0.0, 0.0);
             }
         } else {                  //Arrow glyph section
-            
+
         }
 	}
     glLoadIdentity();
