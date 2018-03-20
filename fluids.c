@@ -63,6 +63,7 @@ unsigned int	textureID[3];
 int texture_mapping = 1;
 int display_divergence = 0;
 int dynamic_scalling = 0;
+int height_plot = 0;
 
 //--- GLUI PARAMETERS ------------------------------------------------------------------------------
 GLUI_RadioGroup *colormap_radio;
@@ -834,6 +835,11 @@ void divergence_cb( int control )
     }
 }
 
+void enable_height_plot( int control )
+{
+    //Set default perspective and stuff
+}
+
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
 //display: Handle window redrawing events. Simply delegates to visualize().
@@ -1058,6 +1064,7 @@ int main(int argc, char **argv)
 	glui->add_checkbox("Show divergence", &display_divergence, -1, divergence_cb);
     glui->add_checkbox("Render smoke", &draw_smoke);
     glui->add_checkbox("Render glyphs", &draw_vecs);
+    glui->add_checkbox("Height plot", &height_plot, -1, enable_height_plot);
 
     printf("Clamp max initial value: %f",clamp_max);
 
