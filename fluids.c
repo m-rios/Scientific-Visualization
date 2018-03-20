@@ -40,7 +40,7 @@ int   draw_vecs = 0;            //draw the vector field or not
 const int COLOR_BLACKWHITE=0;   //different types of color mapping: black-and-white, rainbow, banded
 const int COLOR_RAINBOW=1;
 const int COLOR_HEATMAP=2;
-int   scalar_col = 0;           //method for scalar coloring
+int   scalar_col = 1;           //method for scalar coloring
 int   frozen = 0;               //toggles on/off the animation
 
 int n_values = 0;
@@ -443,7 +443,7 @@ void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
             int next_y = ((j + 1) * DIM) + i; //next cell in y
 
             int current = (j * DIM) + i;
-			dataset[current] = (x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn;	//Divergence operator
+			dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*1000;	//Divergence operator
         }
     }
 }
@@ -693,55 +693,40 @@ void visualize(void)
 						glVertex2f((wn + (fftw_real) i * wn) + vec_scale * vx[idx],
 								   (hn + (fftw_real) j * hn) + vec_scale * vy[idx]);
 					}
-
-
 				}
 			}
 			glEnd();
-		}
-        if (glyph && typeGlyph != 0) //use cones and arrows for glyphs
+        }
+        else if (typeGlyph == 1) //Conical glyph section
         {
-            if (typeGlyph == 1) {     //Conical glyph section
-
-//                glPushMatrix();
-//				glTranslatef(300.0,0.0,0.0);
-//                glTranslatef(0.0,400.0,0.0);
-//                //glColor3f(0.0,1.0,0.0);
-//                glRotatef(spin, 1.0, 0.0, 0.0);
-//                glutSolidCone(80, 80, 80, 80);
-//                glPopMatrix();
+            for (j = 0; j < DIM; j++) {
                 for (i = 0; i < DIM ; i++) {
-					for (j = 0; j < DIM; j++) {
-						idx = (j * DIM) + i;
-						set_colormap(dataset[idx]); //applying colourmapping
-						if (vGlyph == 0)//fluid velocity
-						{
-							//(3.1415927 / 180.0) * angle;
-
-							double magV = sqrt(pow(vx[idx], 2) + pow(vy[idx], 2));
-							double angleV = atan2(vx[idx], vy[idx]);
-							double deg = angleV *(180/3.1415927);
-							//todo:rotation based on the direction
-							//glRotatef(cos(deg),1.0,0.0,0.0);
-							//glRotatef(sin(deg),0.0,1.0,0.0);
-							//glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
-							glutSolidCone(magV * 200, magV * 200, 20, 20);
-							glTranslatef(0.0, hn, 0.0);
-						} else if (vGlyph == 1) // force
-						{
-							double magF = sqrt(pow(fx[idx], 2) + pow(fy[idx], 2));
-							double angleF = atan2(fx[idx], fy[idx]);
-							double deg = angleF *(180/3.1415927);
-							glutSolidCone(magF * 200, magF * 200, 20, 20);
-							glTranslatef(0.0,hn, 0.0);
-						}
-					}
-                    glTranslatef(0.0, -(hn*j), 0.0);
-					glTranslatef(wn,0.0, 0.0);
-				}
-            } else {                  //Arrow glyph section
-
+                    idx = (j * DIM) + i;
+                    set_colormap(dataset[idx]); //applying colourmapping
+                    if (vGlyph == 0)//fluid velocity
+                    {
+                        double magV = sqrt(pow(vx[idx], 2) + pow(vy[idx], 2));
+                        double angleV = atan2(vx[idx], vy[idx]);
+                        double deg = angleV *(180/3.1415927);
+                        glTranslatef(i*wn, j*hn, -5.0);
+                        //todo:rotation based on the direction
+                        glRotatef(90,  0.0, 1.0, 0.0);
+                        glRotatef(-deg, 1.0, 0.0, 0.0);
+                        //glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
+                        glutSolidCone(10.0, magV * 200, 20, 20);
+                        glLoadIdentity();
+                    } else if (vGlyph == 1) // force
+                    {
+                        double magF = sqrt(pow(fx[idx], 2) + pow(fy[idx], 2));
+                        double angleF = atan2(fx[idx], fy[idx]);
+                        double deg = angleF *(180/3.1415927);
+                        glutSolidCone(magF * 200, magF * 200, 20, 20);
+                        glTranslatef(0.0,hn, 0.0);
+                    }
+                }
             }
+        } else {                  //Arrow glyph section
+
         }
 	}
     glLoadIdentity();
@@ -813,6 +798,21 @@ void glyphtype_cb(int control)
 {
     typeGlyph = glyphtype->get_int_val();
 }
+
+void divergence_cb( int control )
+{
+    if (display_divergence)
+    {
+        clamp_min_spinner->set_int_limits(-1, 0);
+        clamp_min_spinner->set_int_val(-1);
+    }
+    else
+    {
+        clamp_min_spinner->set_int_limits(0, 1);
+        clamp_min_spinner->set_int_val(0);
+    }
+}
+
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
 //display: Handle window redrawing events. Simply delegates to visualize().
@@ -980,7 +980,7 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( dataset_radio, "Velocity" );
     new GLUI_RadioButton( dataset_radio, "Force" );
 
-    button = new GLUI_Button(glui, "View Glyphs", 5, glyph_button_cb);
+//    button = new GLUI_Button(glui, "View Glyphs", 5, glyph_button_cb);
 //    GLUI_Panel *glyphscalar_panel = new GLUI_Panel( glui, "scalar value for glyph" );
 //    glyph_radio = new GLUI_RadioGroup(glyphscalar_panel, (&sGlyph), 4, control_cb);
 //    new GLUI_RadioButton( glyph_radio, "rho" );
@@ -1003,13 +1003,15 @@ int main(int argc, char **argv)
     clamp_max_spinner = glui->add_spinner_to_panel(clamping_panel, "Clamp max", GLUI_SPINNER_FLOAT, &clamp_max);
     clamp_min_spinner = glui->add_spinner_to_panel(clamping_panel, "Clamp min", GLUI_SPINNER_FLOAT, &clamp_min);
     clamp_max_spinner->set_int_limits(0, 1);
-    clamp_min_spinner->set_int_limits(0, 1);
+    clamp_min_spinner->set_int_limits(-1, 1);
     clamp_max_spinner->set_float_val(1.0f);
     clamp_min_spinner->set_float_val(0.0f);
 
     glui->add_checkbox("Use texture mapping", &texture_mapping);
     glui->add_checkbox("Dynamic scaling", &dynamic_scalling);
-	glui->add_checkbox("Show divergence", &display_divergence);
+	glui->add_checkbox("Show divergence", &display_divergence, -1, divergence_cb);
+    glui->add_checkbox("Render smoke", &draw_smoke);
+    glui->add_checkbox("Render glyphs", &draw_vecs);
 
     printf("Clamp max initial value: %f",clamp_max);
 
