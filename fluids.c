@@ -60,7 +60,7 @@ int apply_mode = 2;
 float clamp_min = 0.0f;
 float clamp_max = 1.0f;
 unsigned int	textureID[3];
-int texture_mapping = 0;
+int texture_mapping = 1;
 int display_divergence = 0;
 int dynamic_scalling = 0;
 
@@ -434,19 +434,15 @@ void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
 {
     fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
     fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
-
     for (int j = 0; j < DIM - 1; j++)
     {
         for (int i = 0; i < DIM - 1; i++)
 		{
-//            double px = wn + (fftw_real) i * wn;
-//            double py = hn + (fftw_real) j * hn;
+            int next_x = (j * DIM) + (i + 1); //next in x
+            int next_y = ((j + 1) * DIM) + i; //next cell in y
 
-			int idx1 = ((j + 1) * DIM) + i;
-			int idx3 = (j * DIM) + (i + 1);
-
-            int idx0 = (j * DIM) + i;
-			dataset[idx0] = (x[idx0+i] - x[idx0]) + (y[idx0+DIM] - y[idx0]);	//Divergence operator
+            int current = (j * DIM) + i;
+			dataset[current] = (x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn;	//Divergence operator
         }
     }
 }
@@ -957,7 +953,7 @@ int main(int argc, char **argv)
     clamp_min_spinner->set_float_val(0.0f);
 
     glui->add_checkbox("Use texture mapping", &texture_mapping);
-    glui->add_checkbox("Disable dynamic scaling", &dynamic_scalling);
+    glui->add_checkbox("Dynamic scaling", &dynamic_scalling);
 	glui->add_checkbox("Show divergence", &display_divergence);
 
     printf("Clamp max initial value: %f",clamp_max);
