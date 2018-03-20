@@ -443,7 +443,7 @@ void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
             int next_y = ((j + 1) * DIM) + i; //next cell in y
 
             int current = (j * DIM) + i;
-			dataset[current] = (x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn;	//Divergence operator
+			dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*1000;	//Divergence operator
         }
     }
 }
@@ -798,6 +798,21 @@ void glyphtype_cb(int control)
 {
     typeGlyph = glyphtype->get_int_val();
 }
+
+void divergence_cb( int control )
+{
+    if (display_divergence)
+    {
+        clamp_min_spinner->set_int_limits(-1, 0);
+        clamp_min_spinner->set_int_val(-1);
+    }
+    else
+    {
+        clamp_min_spinner->set_int_limits(0, 1);
+        clamp_min_spinner->set_int_val(0);
+    }
+}
+
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
 //display: Handle window redrawing events. Simply delegates to visualize().
@@ -988,13 +1003,13 @@ int main(int argc, char **argv)
     clamp_max_spinner = glui->add_spinner_to_panel(clamping_panel, "Clamp max", GLUI_SPINNER_FLOAT, &clamp_max);
     clamp_min_spinner = glui->add_spinner_to_panel(clamping_panel, "Clamp min", GLUI_SPINNER_FLOAT, &clamp_min);
     clamp_max_spinner->set_int_limits(0, 1);
-    clamp_min_spinner->set_int_limits(0, 1);
+    clamp_min_spinner->set_int_limits(-1, 1);
     clamp_max_spinner->set_float_val(1.0f);
     clamp_min_spinner->set_float_val(0.0f);
 
     glui->add_checkbox("Use texture mapping", &texture_mapping);
     glui->add_checkbox("Dynamic scaling", &dynamic_scalling);
-	glui->add_checkbox("Show divergence", &display_divergence);
+	glui->add_checkbox("Show divergence", &display_divergence, -1, divergence_cb);
     glui->add_checkbox("Render smoke", &draw_smoke);
     glui->add_checkbox("Render glyphs", &draw_vecs);
 
