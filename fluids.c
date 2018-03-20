@@ -65,11 +65,13 @@ int dynamic_scalling = 0;
 
 //--- GLUI PARAMETERS ------------------------------------------------------------------------------
 GLUI_RadioGroup *colormap_radio;
+GLUI_RadioGroup *glyphtype;
 GLUI_RadioGroup *dataset_radio;
 GLUI_RadioGroup *glyph_radio;
 GLUI_Button *button;
 int sGlyph = 0;
 int vGlyph = 0;
+int typeGlyph = 0;
 bool glyph = false;
 int   main_window;
 GLUI *glui_v_subwindow;
@@ -80,6 +82,7 @@ GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
 const int RADIO_GLYPH = 2;
+int spin;
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
 
@@ -348,7 +351,6 @@ void draw_text(const char* text, int x, int y)
 
 void draw_legend(fftw_real min_v, fftw_real max_v)
 {
-
     float step = (float) winHeight / (float) n_colors;
 
     if (texture_mapping) glEnable(GL_TEXTURE_1D);
@@ -658,41 +660,91 @@ void visualize(void)
 
 	if (draw_vecs)
 	{
-		glBegin(GL_LINES);				//draw velocities
+		if (typeGlyph == 0 ) {
+			glBegin(GL_LINES);                //draw velocities
 
-		for (i = 0; i < DIM; i++)
-			for (j = 0; j < DIM; j++)
-			{
-				idx = (j * DIM) + i;
-				direction_to_color(vx[idx],vy[idx],color_dir);
-                //mapping the scalar value of the dataset with color.
-                if (glyph)
-                {//User selects glyphs options
-                    set_colormap(dataset[idx]);
-                    //todo calculate the magnitude of all vectors and substitute with vec_scale
-                    if (vGlyph == 0)//fluid velocity
-                    {
-                        //(3.1415927 / 180.0) * angle;
-                        double magV = sqrt(pow(vx[idx],2) + pow(vy[idx],2));
-                        double angleV = atan2(vx[idx],vy[idx]);
-                        glVertex2f(wn + (fftw_real)i * wn, hn + (fftw_real)j * hn);
-                        glVertex2f((wn + (fftw_real)i * wn) +  vec_scale * cos(angleV) * magV, (hn + (fftw_real)j * hn) + vec_scale *sin(angleV) * magV);
-                    }
+			for (i = 0; i < DIM; i++) {
+				for (j = 0; j < DIM; j++) {
+					idx = (j * DIM) + i;
+					direction_to_color(vx[idx], vy[idx], color_dir);
+					//mapping the scalar value of the dataset with color.
+					if (glyph ) {//User selects glyphs options
+						set_colormap(dataset[idx]);
+						if (vGlyph == 0)//fluid velocity
+						{
+							//(3.1415927 / 180.0) * angle;
+							double magV = sqrt(pow(vx[idx], 2) + pow(vy[idx], 2));
+							double angleV = atan2(vx[idx], vy[idx]);
+							glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
+							glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
+									   (hn + (fftw_real) j * hn) + vec_scale * sin(angleV) * magV);
+						}
 
-                    if (vGlyph == 1)//force
-                    {
-                        double magF = sqrt(pow(fx[idx],2) + pow(fy[idx],2));
-                        double angleF = atan2(fx[idx],fy[idx]);
-                        glVertex2f(wn + (fftw_real)i * wn, hn + (fftw_real)j * hn);
-                        glVertex2f((wn + (fftw_real)i * wn) + 500 * cos(angleF) * magF, (hn + (fftw_real)j * hn) + 500 * sin(angleF) * magF);
-                    }
-                }  else {
-                    glVertex2f(wn + (fftw_real)i * wn, hn + (fftw_real)j * hn);
-                    glVertex2f((wn + (fftw_real)i * wn) + vec_scale * vx[idx], (hn + (fftw_real)j * hn) + vec_scale * vy[idx]);
-                }
+						if (vGlyph == 1)//force
+						{
+							double magF = sqrt(pow(fx[idx], 2) + pow(fy[idx], 2));
+							double angleF = atan2(fx[idx], fy[idx]);
+							glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
+							glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
+									   (hn + (fftw_real) j * hn) + 500 * sin(angleF) * magF);
+						}
+					} else {
+						glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
+						glVertex2f((wn + (fftw_real) i * wn) + vec_scale * vx[idx],
+								   (hn + (fftw_real) j * hn) + vec_scale * vy[idx]);
+					}
+
+
+				}
 			}
-		glEnd();
+			glEnd();
+		}
+        if (glyph && typeGlyph != 0) //use cones and arrows for glyphs
+        {
+            if (typeGlyph == 1) {     //Conical glyph section
+
+//                glPushMatrix();
+//				glTranslatef(300.0,0.0,0.0);
+//                glTranslatef(0.0,400.0,0.0);
+//                //glColor3f(0.0,1.0,0.0);
+//                glRotatef(spin, 1.0, 0.0, 0.0);
+//                glutSolidCone(80, 80, 80, 80);
+//                glPopMatrix();
+                for (i = 0; i < DIM ; i++) {
+					for (j = 0; j < DIM; j++) {
+						idx = (j * DIM) + i;
+						set_colormap(dataset[idx]); //applying colourmapping
+						if (vGlyph == 0)//fluid velocity
+						{
+							//(3.1415927 / 180.0) * angle;
+
+							double magV = sqrt(pow(vx[idx], 2) + pow(vy[idx], 2));
+							double angleV = atan2(vx[idx], vy[idx]);
+							double deg = angleV *(180/3.1415927);
+							//todo:rotation based on the direction
+							//glRotatef(cos(deg),1.0,0.0,0.0);
+							//glRotatef(sin(deg),0.0,1.0,0.0);
+							//glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
+							glutSolidCone(magV * 200, magV * 200, 20, 20);
+							glTranslatef(0.0, hn, 0.0);
+						} else if (vGlyph == 1) // force
+						{
+							double magF = sqrt(pow(fx[idx], 2) + pow(fy[idx], 2));
+							double angleF = atan2(fx[idx], fy[idx]);
+							double deg = angleF *(180/3.1415927);
+							glutSolidCone(magF * 200, magF * 200, 20, 20);
+							glTranslatef(0.0,hn, 0.0);
+						}
+					}
+                    glTranslatef(0.0, -(hn*j), 0.0);
+					glTranslatef(wn,0.0, 0.0);
+				}
+            } else {                  //Arrow glyph section
+
+            }
+        }
 	}
+    glLoadIdentity();
     draw_legend(min_v, max_v);
 }
 
@@ -757,7 +809,10 @@ void glyph_button_cb(int control)
    printf ("Glyph view disabled");
   }
 }
-
+void glyphtype_cb(int control)
+{
+    typeGlyph = glyphtype->get_int_val();
+}
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
 //display: Handle window redrawing events. Simply delegates to visualize().
@@ -865,6 +920,17 @@ void drag(int mx, int my)
 	lmx = mx;
 	lmy = my;
 }
+
+static void TimeEvent(int te)
+{
+
+    spin++;  // increase cube rotation by 1
+    if (spin > 360) spin = 0; // if over 360 degress, start back at zero.
+    glutPostRedisplay();  // Update screen with new rotation data
+    glutTimerFunc( 100, TimeEvent, 1);  // Reset our timmer.
+}
+
+
 //main: The main program
 int main(int argc, char **argv)
 {
@@ -889,7 +955,7 @@ int main(int argc, char **argv)
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-	glutInitWindowSize(750,500);
+	glutInitWindowSize(900,900);
     glutInitWindowPosition( 50, 50 );
 
 
@@ -898,8 +964,7 @@ int main(int argc, char **argv)
 	glutKeyboardFunc(keyboard);
 	glutMotionFunc(drag);
     glutReshapeFunc(reshape);
-
-
+    glutTimerFunc( 10, TimeEvent, 1);
     glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
 
     
@@ -927,6 +992,11 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( glyph_radio, "fluid velocity" );
     new GLUI_RadioButton( glyph_radio, "force" );
 
+	GLUI_Panel *glyphtype_panel = new GLUI_Panel( glui, "choose the type of glyph" );
+	glyphtype = new GLUI_RadioGroup(glyphtype_panel , (&typeGlyph), 6, glyphtype_cb);
+	new GLUI_RadioButton( glyphtype, "default" );
+	new GLUI_RadioButton( glyphtype, "cones" );
+	new GLUI_RadioButton( glyphtype, "arrows" );
 
     GLUI_Panel *clamping_panel = new GLUI_Panel( glui, "Clamping options" );
     glui->add_checkbox_to_panel(clamping_panel, "Apply clamping", &apply_mode);
