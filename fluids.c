@@ -833,7 +833,7 @@ void reshape(int w, int h)
 	glViewport(0.0f, 0.0f, (GLfloat)w, (GLfloat)h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluOrtho2D(0.0, (GLdouble)w, 0.0, (GLdouble)h);
+	glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10.0, 10.0);
 	winWidth = w; winHeight = h;
     gridWidth = winWidth - legend_size - legend_text_len;
     gridHeight = winHeight;
