@@ -49,7 +49,7 @@ int   legend_size = 50;
 
 int   n_colors = 256;           //number of colors used in the color map
 
-int   legend_text_len = 100;
+int   legend_text_len = 85;
 const int DATASET_DENSITY=0;    //Density is the dataset to be displayed
 const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
 const int DATASET_FORCE=2;      //Force is the dataset to be displayed
@@ -370,9 +370,9 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
         float v = (float) j/((float) (n_colors-1));
 
         float y0 = hn+step*j;
-        float x0 = winWidth-legend_size-legend_text_len; //do not hardcode legend size
+        float x0 = gridWidth; //do not hardcode legend size
         float y1 = hn+step*(j+1);
-        float x1 = winWidth-legend_text_len;
+        float x1 = gridWidth + legend_size;
 
         if (texture_mapping)
         {
@@ -666,8 +666,8 @@ void draw_smoke_default()
 void visualize(void)
 {
 	int        i, j, idx;
-	fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
-	fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
+//	fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
+//	fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
 
     fftw_real min_v, max_v;
     size_t dim = DIM * 2*(DIM/2+1);
@@ -865,8 +865,7 @@ void reshape(int w, int h)
     GLUI_Master.auto_set_viewport();
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-    GLfloat aspect = w / h;
-	glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10., 10.0);
+	glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10.0, 10.0);
     winWidth = w; winHeight = h;
     gridWidth = winWidth - legend_size - legend_text_len;
     gridHeight = winHeight;
@@ -1025,7 +1024,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
+    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
 
     
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
@@ -1039,13 +1038,6 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( dataset_radio, "Density" );
     new GLUI_RadioButton( dataset_radio, "Velocity" );
     new GLUI_RadioButton( dataset_radio, "Force" );
-
-//    button = new GLUI_Button(glui, "View Glyphs", 5, glyph_button_cb);
-//    GLUI_Panel *glyphscalar_panel = new GLUI_Panel( glui, "scalar value for glyph" );
-//    glyph_radio = new GLUI_RadioGroup(glyphscalar_panel, (&sGlyph), 4, control_cb);
-//    new GLUI_RadioButton( glyph_radio, "rho" );
-//    new GLUI_RadioButton( glyph_radio, "||v||" );
-//    new GLUI_RadioButton( glyph_radio, "||f||" );
 
     GLUI_Panel *glyphvector_panel = new GLUI_Panel( glui, "vector value for glyph" );
     glyph_radio = new GLUI_RadioGroup(glyphvector_panel , (&vGlyph), RADIO_GLYPH, radio_cb);
