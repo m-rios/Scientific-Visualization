@@ -508,6 +508,8 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
             dataset[i] = min(clamp_max, dataset[i]);
             dataset[i] = max(clamp_min, dataset[i]);
             dataset[i] = scale(clamp_min, clamp_max, dataset[i]);
+            *min_v = (fftw_real) clamp_min;
+            *max_v = (fftw_real) clamp_max;
         }
     }
 }
@@ -666,8 +668,6 @@ void draw_smoke_default()
 void visualize(void)
 {
 	int        i, j, idx;
-//	fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
-//	fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
 
     fftw_real min_v, max_v;
     size_t dim = DIM * 2*(DIM/2+1);
@@ -850,8 +850,16 @@ void enable_height_plot( int control )
 void display(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+//    glMatrixMode(GL_PROJECTION);
+//    glLoadIdentity();
+//    glFrustum(-1, 1, -1, 1, 1, 1000);
+
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+
+    gluLookAt ( 0.0, 0.0, 10.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0 );
+
     visualize();
 
 	glFlush();
@@ -861,8 +869,10 @@ void display(void)
 //reshape: Handle window resizing (reshaping) events
 void reshape(int w, int h)
 {
-//	glViewport(0.0f, 0.0f, (GLfloat)w, (GLfloat)h);
-    GLUI_Master.auto_set_viewport();
+    int tx, ty, tw, th;
+    GLUI_Master.get_viewport_area(&tx, &ty, &tw, &th);
+    glViewport(tx, ty, tw, th);
+
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10.0, 10.0);
@@ -971,6 +981,9 @@ int orbit_view(int mx, int my)
 void drag(int mx, int my)
 {
 	if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
+    glutSetWindow(glui->get_glut_window_id());
+
+//    mx -= 150;
 
     if (left_button == GLUT_DOWN)
         add_matter(mx, my);
@@ -1066,9 +1079,6 @@ int main(int argc, char **argv)
     glui->add_checkbox("Render glyphs", &draw_vecs);
     glui->add_checkbox("Height plot", &height_plot, -1, enable_height_plot);
 
-    printf("Clamp max initial value: %f",clamp_max);
-
-//    (new GLUI_Spinner( glui, "Number of colours", &n_colors ))->set_int_limits( 3, 256 );
     GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &n_colors, -1, color_bands_cb);
     color_bands_spinner->set_int_limits(3, 256);
 
@@ -1080,9 +1090,7 @@ int main(int argc, char **argv)
     glui->set_main_gfx_window( main_window );
     GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
 
-//    int x,y,glui_width, glui_heigth;
-//    GLUI_Master.get_viewport_area(&x, &y, &glui_width, &glui_heigth );
-//    reshape(winWidth+glui_width, winHeight);
+//    glui->hide();
 
 	init_simulation(DIM);	//initialize the simulation data structures
     create_textures();
