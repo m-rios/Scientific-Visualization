@@ -347,15 +347,19 @@ void draw_text(const char* text, int x, int y)
     int len = strlen( text );
 
     glColor3f( 1.0f, 1.0f, 1.0f );
-    glRasterPos2f( x, y );
+    glPushMatrix();
+    glTranslatef(x, y, 0.0f);
+    glScalef(0.15, 0.15, 0.15);
     for( int i = 0; i < len; i++ ) {
-        glutBitmapCharacter( GLUT_BITMAP_TIMES_ROMAN_24, text[i] );
+//        glutBitmapCharacter( GLUT_BITMAP_TIMES_ROMAN_24, text[i] );
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, (int) text[i]);
     }
+    glPopMatrix();
 }
 
 void draw_legend(fftw_real min_v, fftw_real max_v)
 {
-    float step = (float) winHeight / (float) n_colors;
+    float step = (float) (winHeight - 2 *hn) / (float) n_colors;
 
     if (texture_mapping) glEnable(GL_TEXTURE_1D);
 
@@ -365,9 +369,9 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
 
         float v = (float) j/((float) (n_colors-1));
 
-        float y0 = step*j;
+        float y0 = hn+step*j;
         float x0 = winWidth-legend_size-legend_text_len; //do not hardcode legend size
-        float y1 = step*(j+1);
+        float y1 = hn+step*(j+1);
         float x1 = winWidth-legend_text_len;
 
         if (texture_mapping)
@@ -384,10 +388,10 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
     }
     if (texture_mapping) glDisable(GL_TEXTURE_1D);
     char string[48];
-    snprintf (string, sizeof(string), "%f", min_v);
-    draw_text(string, winWidth-legend_text_len, 0);
-    snprintf (string, sizeof(string), "%f", max_v);
-    draw_text(string, winWidth-legend_text_len, winHeight-15);
+    snprintf (string, sizeof(string), "%1.3f", min_v);
+    draw_text(string, winWidth-legend_text_len, hn);
+    snprintf (string, sizeof(string), "%1.3f", max_v);
+    draw_text(string, winWidth-legend_text_len, (DIM-1)*hn);
 }
 
 
@@ -559,22 +563,22 @@ void draw_smoke_textures(void)
             px0 = wn + (fftw_real)i * wn;
             py0 = hn + (fftw_real)j * hn;
             idx0 = (j * DIM) + i;
-            pz0 = dataset[idx0];
+            if (height_plot) pz0 = dataset[idx0];
 
             px1 = wn + (fftw_real)i * wn;
             py1 = hn + (fftw_real)(j + 1) * hn;
             idx1 = ((j + 1) * DIM) + i;
-            pz1 = dataset[idx1];
+            if (height_plot) pz1 = dataset[idx1];
 
             px2 = wn + (fftw_real)(i + 1) * wn;
             py2 = hn + (fftw_real)(j + 1) * hn;
             idx2 = ((j + 1) * DIM) + (i + 1);
-            pz2 = dataset[idx2];
+            if (height_plot) pz2 = dataset[idx2];
 
             px3 = wn + (fftw_real)(i + 1) * wn;
             py3 = hn + (fftw_real)j * hn;
             idx3 = (j * DIM) + (i + 1);
-            pz3 = dataset[idx3];
+            if (height_plot) pz3 = dataset[idx3];
 
             fftw_real v0, v1, v2, v3;
 
@@ -670,7 +674,7 @@ void visualize(void)
     fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
-    draw_grid();
+    if (height_plot) draw_grid();
 
 	if (draw_smoke)
 	{
@@ -857,15 +861,18 @@ void display(void)
 //reshape: Handle window resizing (reshaping) events
 void reshape(int w, int h)
 {
-	glViewport(0.0f, 0.0f, (GLfloat)w, (GLfloat)h);
+//	glViewport(0.0f, 0.0f, (GLfloat)w, (GLfloat)h);
+    GLUI_Master.auto_set_viewport();
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluOrtho2D(0.0, (GLdouble)w, 0.0, (GLdouble)h);
-	winWidth = w; winHeight = h;
+    GLfloat aspect = w / h;
+	glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10., 10.0);
+    winWidth = w; winHeight = h;
     gridWidth = winWidth - legend_size - legend_text_len;
     gridHeight = winHeight;
     wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
     hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
+    glutPostRedisplay();
 }
 
 //keyboard: Handle key presses
@@ -1006,7 +1013,8 @@ int main(int argc, char **argv)
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-	glutInitWindowSize(900,900);
+    winWidth = 900; winHeight = 900;
+	glutInitWindowSize(winWidth,winHeight);
     glutInitWindowPosition( 50, 50 );
 
 
@@ -1017,7 +1025,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
+    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
 
     
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
@@ -1080,6 +1088,9 @@ int main(int argc, char **argv)
     glui->set_main_gfx_window( main_window );
     GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
 
+//    int x,y,glui_width, glui_heigth;
+//    GLUI_Master.get_viewport_area(&x, &y, &glui_width, &glui_heigth );
+//    reshape(winWidth+glui_width, winHeight);
 
 	init_simulation(DIM);	//initialize the simulation data structures
     create_textures();
@@ -1087,9 +1098,3 @@ int main(int argc, char **argv)
 	glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
 	return 0;
 }
-
-//TODO:
-//
-//- texture color mapping from book example.
-//- check equation 5.1, maybe clamping and scalling can be implemented directly by colormap function using the formula, the
-//    only difference is the input of the min/max values (dataset determined for scaling, user for clamping).
