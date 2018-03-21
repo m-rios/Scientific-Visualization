@@ -50,3 +50,11 @@ target_link_libraries(smoke ${LIBS})
 set(TESTS_SOURCES tests.c)
 add_executable(tests ${TESTS_SOURCES})
 target_link_libraries(tests ${LIBS})
+
+## Gui subwindow examples ##############################################################################################
+add_executable(glui_ex subwindow_ex.cpp)
+target_link_libraries(glui_ex ${LIBS})
+
+## Gui subwindow examples ##############################################################################################
+add_executable(cones cones.c)
+target_link_libraries(cones ${LIBS})
