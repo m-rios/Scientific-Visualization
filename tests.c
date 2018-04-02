@@ -6,6 +6,8 @@
 
 #include <GL/glut.h>  // GLUT, include glu.h and gl.h
 #include <math.h>
+#include <printf.h>
+
 GLfloat LightAmbient[]= { 0.5f, 0.5f, 0.5f, 1.0f };
 
 // Clears the window and depth buffer and draws three solids.
@@ -35,10 +37,10 @@ void display() {
     // Make a cone.  The standard cone "points" along z; we want it pointing
     // along y, hence the 270 degree rotation about x.
 //    glPushMatrix();
-    glTranslatef(-0.75, -0.5, 1.0);
-    glRotatef(90.0, 1.0, 1.0, 0.0);
-    glRotatef(90.0, -1.0, 1.0, 0.0);
-    glutSolidCone(1.0, 2.0, 70, 12);
+//    glTranslatef(-0.75, -0.5, 1.0);
+//    glRotatef(90.0, 1.0, 1.0, 0.0);
+//    glRotatef(90.0, -1.0, 1.0, 0.0);
+//    glutSolidCone(1.0, 2.0, 70, 12);
 
     //glLoadIdentity();
 
@@ -55,6 +57,16 @@ void display() {
 //    glPopMatrix();
 
     glPopMatrix();
+    glLineWidth(10.0f);
+    glBegin(GL_LINES);
+    glVertex2f(0.0,0.0);
+    glVertex2f(5.0,5.0);
+
+    glVertex2f(2.0,2.0);
+    glVertex2f(5.0,3.0);
+    float lineWidth[2];
+    printf("%f",glGetFloatv(GL_LINE_WIDTH_RANGE, lineWidth));
+    glEnd();
     glFlush();
 }
 
