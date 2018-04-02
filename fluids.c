@@ -21,7 +21,7 @@
 
 
 //--- SIMULATION PARAMETERS ------------------------------------------------------------------------
-const int DIM = 50;				//size of simulation grid
+const int DIM = 20;				//size of simulation grid
 double dt = 0.4;				//simulation time step
 float visc = 0.001;				//fluid viscosity
 fftw_real *vx, *vy;             //(vx,vy)   = velocity field at the current moment
@@ -34,7 +34,7 @@ rfftwnd_plan plan_rc, plan_cr;  //simulation domain discretization
 int   winWidth, winHeight;      //size of the graphics window, in pixels
 int   gridWidth, gridHeight;    //size of the simulation grid in pixels
 int   color_dir = 0;            //use direction color-coding or not
-float vec_scale = 1000;			//scaling of hedgehogs
+float vec_scale = 400;			//scaling of hedgehogs
 int   draw_smoke = 1;           //draw the smoke or not
 int   draw_vecs = 0;            //draw the vector field or not
 const int COLOR_BLACKWHITE=0;   //different types of color mapping: black-and-white, rainbow, banded
@@ -685,8 +685,8 @@ void visualize(void)
 							double magF = sqrt(pow(fx[idx], 2) + pow(fy[idx], 2));
 							double angleF = atan2(fx[idx], fy[idx]);
 							glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
-							glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
-									   (hn + (fftw_real) j * hn) + 500 * sin(angleF) * magF);
+							glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleF) * magF,
+									   (hn + (fftw_real) j * hn) + vec_scale * sin(angleF) * magF);
 						}
 					} else {
 						glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
