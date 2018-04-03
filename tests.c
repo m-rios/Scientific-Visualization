@@ -1,119 +1,129 @@
-#include <math.h>               //for various math functions
+/*
+ * GL01Hello.cpp: Test OpenGL/GLUT C/C++ Setup
+ * Tested under Eclipse CDT with MinGW/Cygwin and CodeBlocks with MinGW
+ * To compile with -lfreeglut -lglu32 -lopengl32
+ */
 
-#ifdef LINUX
-#include <GL/glut.h>            //the GLUT graphics library
-#endif
+#include <GL/glut.h>  // GLUT, include glu.h and gl.h
+#include <math.h>
+#include <printf.h>
 
-#ifdef MACOS
-#include <GLUT/glut.h>            //the GLUT graphics library
-#endif
+GLfloat LightAmbient[]= { 0.5f, 0.5f, 0.5f, 1.0f };
 
-//Global variables -----------------------------------------------------------------------------------------------------
-int winWidth, winHeight;        //Size of the GL window
-int n_values = 256;             //Number of values for the color map
-
-float max(float x, float y) { return x > y ? x : y; }
-
-float min(float x, float y) { return x < y ? x : y; }
-
-//heatmap: Implements a heatmap color palette (Black-Red-Yellow-White).
-void heatmap(float value, float* R, float* G, float* B)
-{
-    //Clamp value between 0 and 1
-    if (value<0)
-        value=0;
-    if (value>1)
-        value=1;
-
-    //For now we don't mess with S,V, only with Hue
-    //Normalise value to [0,3] 0->Black, 1->Full red, 2-> Orange, 3->Full yellow.
-    value *= 4;
-    *R = max(0, 1 - fabs(value/2-1)) + max(0, 1 - fabs(value/2-2));
-    *B = max(0, 1 - fabs(value - 4));
-    *G = max(0, 1 - fabs(value-3)) + max(0, 1 - fabs(value-4));
-}
-
-int mod (int a, int b)
-{
-    if(b < 0) //you can check for b == 0 separately and do what you want
-        return mod(a, -b);
-    int ret = a % b;
-    if(ret < 0)
-        ret+=b;
-    return ret;
-}
-
-void color_test(int i, float* R, float* G, float* B)
-{
-    float r[] = {1, 0, 0};
-    float g[] = {0, 1, 0};
-    float b[] = {0, 0, 1};
-    int ind = mod(i,3);
-    *R = r[ind];
-    *G = g[ind];
-    *B = b[ind];
-}
-
-void draw_legend(void)
-{
-    float R, G, B;
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glBegin(GL_QUADS);
-    float step = (float) winHeight / (float) n_values;
-    for (int j = 0; j < n_values; ++j)
-    {
-        //Normalise value (j) to [0,1]
-        float v = (float) j/((float) n_values);
-
-        float y0 = step*j;
-        float x0 = 0;
-        float y1 = step*(j+1);
-        float x1 = winWidth;
-
-        heatmap(v, &R, &G, &B);
-//        R = 1; G = 0; B = 0;
-//        color_test(j, &R, &G, &B);
-        //Draw quad
-        glColor3f(R,G,B);
-        glVertex2f(x0, y0);
-        glVertex2f(x1, y0);
-        glVertex2f(x1, y1);
-        glVertex2f(x0, y1);
-    }
-    glEnd();
-}
-
-//display: Handle window redrawing events. Simply delegates to visualize().
-void display(void)
-{
+// Clears the window and depth buffer and draws three solids.
+//
+// The solids are placed so that they either sit or float above the x-z plane;
+// therefore note one of the first things that is done is to rotate the whole
+// scene 20 degrees about x to turn the top of the scene toward the viewer.
+// This lets the viewer see how the torus goes around the cone.
+void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    draw_legend();
+    glPushMatrix();
+
+    // Rotate the scene so we can see the tops of the shapes.
+    //glRotatef(-20.0, 1.0, 0.0, 0.0);
+
+    // Make a torus floating 0.5 above the x-z plane.  The standard torus in
+    // the GLUT library is, perhaps surprisingly, a stack of circles which
+    // encircle the z-axis, so we need to rotate it 90 degrees about x to
+    // get it the way we want.
+//    glPushMatrix();
+//    glTranslatef(-0.75, 0.5, 0.0);
+//    glRotatef(90.0, 1.0, 0.0, 0.0);
+//    glutSolidTorus(0.275, 0.85, 16, 40);
+//    glPopMatrix();
+
+    // Make a cone.  The standard cone "points" along z; we want it pointing
+    // along y, hence the 270 degree rotation about x.
+//    glPushMatrix();
+//    glTranslatef(-0.75, -0.5, 1.0);
+//    glRotatef(90.0, 1.0, 1.0, 0.0);
+//    glRotatef(90.0, -1.0, 1.0, 0.0);
+//    glutSolidCone(1.0, 2.0, 70, 12);
+
+    //glLoadIdentity();
+
+//    glTranslatef(-0.75, -0.5, 0.0);
+//    glRotatef(90.0, 0.0, 1.0, 0.0);
+//    glRotatef(90.0, -1.0, 0.0, 0.0);
+//    glutSolidCone(1.0, 2.0, 70, 12);
+  //  glPopMatrix();
+
+//    // Add a sphere to the scene.
+//    glPushMatrix();
+//    glTranslatef(0.75, 0.0, -1.0);
+//    glutSolidSphere(1.0, 30, 30);
+//    glPopMatrix();
+
+    glPopMatrix();
+    glLineWidth(10.0f);
+    glBegin(GL_LINES);
+    glVertex2f(0.0,0.0);
+    glVertex2f(5.0,5.0);
+
+    glVertex2f(2.0,2.0);
+    glVertex2f(5.0,3.0);
+    float lineWidth[2];
+    printf("%f",glGetFloatv(GL_LINE_WIDTH_RANGE, lineWidth));
+    glEnd();
     glFlush();
-    glutSwapBuffers();
 }
 
-
-void reshape(int w, int h)
-{
-    glViewport(0.0f, 0.0f, (GLfloat)w, (GLfloat)h);
+// We don't want the scene to get distorted when the window size changes, so
+// we need a reshape callback.  We'll always maintain a range of -2.5..2.5 in
+// the smaller of the width and height for our viewbox, and a range of -10..10
+// for the viewbox depth.
+void reshape(GLint w, GLint h) {
+    glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
+    GLfloat aspect = w / h;
     glLoadIdentity();
-    gluOrtho2D(0.0, (GLdouble)w, 0.0, (GLdouble)h);
-    winWidth = w; winHeight = h;
+    if (w <= h) {
+        // width is smaller, so stretch out the height
+        glOrtho(-2.5, 2.5, -2.5/aspect, 2.5/aspect, -10.0, 10.0);
+    } else {
+        // height is smaller, so stretch out the width
+        glOrtho(-2.5*aspect, 2.5*aspect, -2.5, 2.5, -10.0, 10.0);
+    }
 }
 
-int main(int argc, char **argv)
-{
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-    glutInitWindowSize(50,500);
-    glutCreateWindow("Legend visualizer");
-    glutDisplayFunc(display);
-    glutReshapeFunc(reshape);
-    glutIdleFunc(glutPostRedisplay);
+// Performs application specific initialization.  It defines lighting
+// parameters for light source GL_LIGHT0: black for ambient, yellow for
+// diffuse, white for specular, and makes it a directional source
+// shining along <-1, -1, -1>.  It also sets a couple material properties
+// to make cyan colored objects with a fairly low shininess value.  Lighting
+// and depth buffer hidden surface removal are enabled here.
+void init() {
+    GLfloat black[] = { 0.0, 0.0, 0.0, 1.0 };
+    GLfloat yellow[] = { 1.0, 1.0, 0.0, 1.0 };
+    GLfloat cyan[] = { 0.0, 1.0, 1.0, 1.0 };
+    GLfloat white[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat direction[] = { 1.0, 1.0, 1.0, 0.0 };
 
-    glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
-    return 0;
+    glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, yellow);
+    glMaterialfv(GL_FRONT, GL_SPECULAR, white);
+    glMaterialf(GL_FRONT, GL_SHININESS, 30);
+
+    glLightfv(GL_LIGHT0, GL_AMBIENT, black);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, yellow);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, white);
+    glLightfv(GL_LIGHT0, GL_POSITION, direction);
+
+    glEnable(GL_LIGHTING);                // so the renderer considers light
+    glEnable(GL_LIGHT0);                  // turn LIGHT0 on
+    glEnable(GL_DEPTH_TEST);              // so the renderer considers depth
+}
+
+// The usual application statup code.
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowPosition(80, 80);
+    glutInitWindowSize(800, 600);
+    glutCreateWindow("Cyan Shapes in Yellow Light");
+    glutReshapeFunc(reshape);
+    glutDisplayFunc(display);
+    init();
+    glutMainLoop();
 }
