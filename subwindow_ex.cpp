@@ -262,7 +262,7 @@ void myGlutDisplay(	void )
     // projection transform
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glFrustum(-1, 1, -1, 1, 1, 1000);
+    glFrustum(-.5, .5, -.5, .5, 1, 1000);
 
     // camera transform
     glMatrixMode(GL_MODELVIEW);
@@ -273,6 +273,10 @@ void myGlutDisplay(	void )
     //
     // draw some stuff
     //
+
+
+
+
 
     if (live_draw_floor)
     {

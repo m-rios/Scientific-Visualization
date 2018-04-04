@@ -97,6 +97,7 @@ void Visualization::draw_text(const char* text, int x, int y)
 
 void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
 {
+//    glMatrixMode(GL_PROJECTION);
     float step = (float) (winHeight - 2 *hn) / (float) n_colors;
 
     if (texture_mapping) glEnable(GL_TEXTURE_1D);
@@ -270,6 +271,44 @@ void Visualization::draw_grid()
     glEnd();
 }
 
+void Visualization::draw_3d_grid()
+{
+    glBegin(GL_LINES);
+    glColor3f(1,1,1);
+
+    int size = (int) sim->max((float) gridWidth, (float) gridHeight);
+
+    //Draw simple cube outline
+    //Base
+    glVertex3f(0, 0, 0);
+    glVertex3f(size, 0, 0);
+
+    glVertex3f(size, 0, 0);
+    glVertex3f(size, size, 0);
+
+    glVertex3f(size, size, 0);
+    glVertex3f(0, size, 0);
+
+    glVertex3f(0, size, 0);
+    glVertex3f(0, 0, 0);
+
+    //Front
+    glVertex3f(0, 0, 0);
+    glVertex3f(0, 0, size);
+
+    glVertex3f(size, 0, 0);
+    glVertex3f(size, 0, size);
+
+    //Left
+    glVertex3f(size, size, 0);
+    glVertex3f(size, size, size);
+
+    //Right
+    glVertex3f(0, size, 0);
+    glVertex3f(0, size, size);
+    glEnd();
+}
+
 void Visualization::draw_smoke_textures(void)
 {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -303,22 +342,22 @@ void Visualization::draw_smoke_textures(void)
             px0 = wn + (fftw_real)i * wn;
             py0 = hn + (fftw_real)j * hn;
             idx0 = (j * sim->DIM) + i;
-            if (height_plot) pz0 = dataset[idx0];
+            if (height_plot) pz0 = dataset[idx0]*20;
 
             px1 = wn + (fftw_real)i * wn;
             py1 = hn + (fftw_real)(j + 1) * hn;
             idx1 = ((j + 1) * sim->DIM) + i;
-            if (height_plot) pz1 = dataset[idx1];
+            if (height_plot) pz1 = dataset[idx1]*20;
 
             px2 = wn + (fftw_real)(i + 1) * wn;
             py2 = hn + (fftw_real)(j + 1) * hn;
             idx2 = ((j + 1) * sim->DIM) + (i + 1);
-            if (height_plot) pz2 = dataset[idx2];
+            if (height_plot) pz2 = dataset[idx2]*20;
 
             px3 = wn + (fftw_real)(i + 1) * wn;
             py3 = hn + (fftw_real)j * hn;
             idx3 = (j * sim->DIM) + (i + 1);
-            if (height_plot) pz3 = dataset[idx3];
+            if (height_plot) pz3 = dataset[idx3]*20;
 
             fftw_real v0, v1, v2, v3;
 
@@ -421,6 +460,9 @@ void Visualization::visualize(void)
         else
             draw_smoke_default();
     }
+
+    if (height_plot)
+        draw_3d_grid();
 
 	if (draw_vecs)
 	{

@@ -55,3 +55,7 @@ target_link_libraries(tests ${LIBS})
 set(SOURCES_NEW simulation.cpp visualization.cpp interaction.cpp visualization.h simulation.h)
 add_executable(new_arch ${SOURCES_NEW})
 target_link_libraries(new_arch ${LIBS})
+
+## subwindow_ex.cpp ####################################################################################################
+add_executable(subwindow_ex subwindow_ex.cpp)
+target_link_libraries(subwindow_ex ${LIBS})
