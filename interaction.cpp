@@ -24,8 +24,14 @@ const int RADIO_GLYPH = 2;
 int spin;
 int left_button = GLUT_UP;  //left button is initially not pressed
 int right_button = GLUT_UP; //right button is initially not pressed
+int middle_button = GLUT_UP; //middle button is initially not pressed
 Visualization* vis = new Visualization(50);
 Simulation* sim = vis->sim;
+int last_my = 0;
+int last_mx = 0;
+
+float eye[3]; //point representing the eye
+float lookat[3]; //point towards which eye has too point
 
 using namespace std;
 
@@ -86,14 +92,16 @@ void display(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-//    glMatrixMode(GL_PROJECTION);
-//    glLoadIdentity();
-//    glFrustum(-1, 1, -1, 1, 1, 1000);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glFrustum(-.5, .5, -.5, .5, 1, 10000);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-
-//    gluLookAt ( 0.0, 0.0, 10.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0 );
+    if (vis->height_plot) {
+        gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
+        vis->draw_3d_grid();
+    }
 
     vis->visualize();
 
@@ -116,6 +124,10 @@ void reshape(int w, int h)
     vis->gridHeight = vis->winHeight;
     vis->wn = (fftw_real)vis->gridWidth  / (fftw_real)(sim->DIM + 1);
     vis->hn = (fftw_real)vis->gridHeight / (fftw_real)(sim->DIM + 1);
+
+    lookat[0] = vis->gridWidth/2.0f;
+    lookat[1] = vis->gridHeight/2.0f;
+
     glutPostRedisplay();
 }
 
@@ -164,6 +176,11 @@ void mouseCallback(int button, int state, int x, int y)
         left_button = state;
     else if (button == GLUT_RIGHT_BUTTON)
         right_button = state;
+    else if (button == GLUT_MIDDLE_BUTTON)
+        middle_button = state;
+
+    last_mx = x;
+    last_my = y;
 }
 
 //add_matter: When the user drags with the left mouse button pressed, add a force that corresponds to the direction of
@@ -207,23 +224,110 @@ void add_matter(int mx, int my)
     lmy = my;
 }
 
+void crossproduct(float a[3], float b[3], float res[3])
+{
+    res[0] = (a[1] * b[2] - a[2] * b[1]);
+    res[1] = (a[2] * b[0] - a[0] * b[2]);
+    res[2] = (a[0] * b[1] - a[1] * b[0]);
+}
+
+void normalize(float v[3])
+{
+    float l = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+    l = 1 / (float)sqrt(l);
+
+    v[0] *= l;
+    v[1] *= l;
+    v[2] *= l;
+}
+
+float length(float v[3])
+{
+    return (float)sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+}
+
 int orbit_view(int mx, int my)
 {
+    int dx = -(mx-last_mx);
+    int dy = my-last_my;
+    float neye[3], neye2[3];
+    float len;
+    float f[3], r[3], u[3];
 
+    neye[0] = eye[0] - lookat[0];
+    neye[1] = eye[1] - lookat[1];
+    neye[2] = eye[2] - lookat[2];
+
+    // first rotate in the x/z plane
+    float theta = -dx * 0.007;
+    neye2[0] = cos(theta)*neye[0] + sin(theta)*neye[1];
+    neye2[1] = -sin(theta)*neye[0] + cos(theta)*neye[1];
+    neye2[2] = eye[2];
+
+
+    // now rotate vertically
+    theta = -dy * 0.007;
+
+    f[0] = -neye2[0];
+    f[1] = -neye2[1];
+    f[2] = -neye2[2];
+    u[0] = 0;
+    u[1] = 0;
+    u[2] = 1;
+    crossproduct(f, u, r);
+    crossproduct(r, f, u);
+    len = length(f);
+    normalize(f);
+    normalize(u);
+
+    neye[0] = len * ((float)cos(theta)*f[0] + (float)sin(theta)*u[0]);
+    neye[1] = len * ((float)cos(theta)*f[1] + (float)sin(theta)*u[1]);
+    neye[2] = len * ((float)cos(theta)*f[2] + (float)sin(theta)*u[2]);
+
+    eye[0] = lookat[0] - neye[0];
+    eye[1] = lookat[1] - neye[1];
+    eye[2] = lookat[2] - neye[2];
+
+    last_mx=mx; last_my=my;
+}
+
+void zoom(int my)
+{
+    int dy = (my - last_my)*0.5;
+    float neye[3]; //normalized eye, for scaling purposes
+    neye[0] = eye[0];
+    neye[1] = eye[1];
+    neye[2] = eye[2];
+    normalize(neye);
+
+    eye[0] = eye[0] + neye[0]*dy;
+    eye[1] = eye[1] + neye[1]*dy;
+    eye[2] = eye[2] + neye[2]*dy;
 }
 
 // drag: select which action to map mouse drag to, depending on pressed button
 void drag(int mx, int my)
 {
-    if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
-    glutSetWindow(glui->get_glut_window_id());
+    if (!vis->height_plot)
+    {
+       add_matter(mx, my);
+    }
+    else
+    {
+       if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
+       glutSetWindow(glui->get_glut_window_id());
 
-//    mx -= 150;
+       if (middle_button == GLUT_DOWN)
+           zoom(my);
+       else
+       {
+           if (left_button == GLUT_DOWN)
+               add_matter(mx, my);
+           else if (right_button == GLUT_DOWN)
+               orbit_view(mx, my);
+       }
 
-    if (left_button == GLUT_DOWN)
-        add_matter(mx, my);
-    else if (right_button == GLUT_DOWN)
-        orbit_view(mx, my);
+    }
 }
 
 void do_one_simulation_step()
@@ -234,120 +338,6 @@ void do_one_simulation_step()
         vis->do_one_simulation_step();
     }
 }
-
-//void myGlutMotion(int x, int y)
-//{
-//    // the change in mouse position
-//    int dx = x-last_x;
-//    int dy = y-last_y;
-//
-//    float scale, len, theta;
-//    float neye[3], neye2[3];
-//    float f[3], r[3], u[3];
-//
-//    switch(cur_button)
-//    {
-//        case GLUT_LEFT_BUTTON:
-//            // translate
-//            f[0] = lookat[0] - eye[0];
-//            f[1] = lookat[1] - eye[1];
-//            f[2] = lookat[2] - eye[2];
-//            u[0] = 0;
-//            u[1] = 1;
-//            u[2] = 0;
-//
-//            // scale the change by how far away we are
-//            scale = sqrt(length(f)) * 0.007;
-//
-//            crossproduct(f, u, r);
-//            crossproduct(r, f, u);
-//            normalize(r);
-//            normalize(u);
-//
-//            eye[0] += -r[0]*dx*scale + u[0]*dy*scale;
-//            eye[1] += -r[1]*dx*scale + u[1]*dy*scale;
-//            eye[2] += -r[2]*dx*scale + u[2]*dy*scale;
-//
-//            lookat[0] += -r[0]*dx*scale + u[0]*dy*scale;
-//            lookat[1] += -r[1]*dx*scale + u[1]*dy*scale;
-//            lookat[2] += -r[2]*dx*scale + u[2]*dy*scale;
-//
-//            break;
-//
-//        case GLUT_MIDDLE_BUTTON:
-//            // zoom
-//            f[0] = lookat[0] - eye[0];
-//            f[1] = lookat[1] - eye[1];
-//            f[2] = lookat[2] - eye[2];
-//
-//            len = length(f);
-//            normalize(f);
-//
-//            // scale the change by how far away we are
-//            len -= sqrt(len)*dx*0.03;
-//
-//            eye[0] = lookat[0] - len*f[0];
-//            eye[1] = lookat[1] - len*f[1];
-//            eye[2] = lookat[2] - len*f[2];
-//
-//            // make sure the eye and lookat points are sufficiently far away
-//            // push the lookat point forward if it is too close
-//            if (len < 1)
-//            {
-//                printf("lookat move: %f\n", len);
-//                lookat[0] = eye[0] + f[0];
-//                lookat[1] = eye[1] + f[1];
-//                lookat[2] = eye[2] + f[2];
-//            }
-//
-//            break;
-//
-//        case GLUT_RIGHT_BUTTON:
-//            // rotate
-//
-//            neye[0] = eye[0] - lookat[0];
-//            neye[1] = eye[1] - lookat[1];
-//            neye[2] = eye[2] - lookat[2];
-//
-//            // first rotate in the x/z plane
-//            theta = -dx * 0.007;
-//            neye2[0] = (float)cos(theta)*neye[0] + (float)sin(theta)*neye[2];
-//            neye2[1] = neye[1];
-//            neye2[2] =-(float)sin(theta)*neye[0] + (float)cos(theta)*neye[2];
-//
-//
-//            // now rotate vertically
-//            theta = -dy * 0.007;
-//
-//            f[0] = -neye2[0];
-//            f[1] = -neye2[1];
-//            f[2] = -neye2[2];
-//            u[0] = 0;
-//            u[1] = 1;
-//            u[2] = 0;
-//            crossproduct(f, u, r);
-//            crossproduct(r, f, u);
-//            len = length(f);
-//            normalize(f);
-//            normalize(u);
-//
-//            neye[0] = len * ((float)cos(theta)*f[0] + (float)sin(theta)*u[0]);
-//            neye[1] = len * ((float)cos(theta)*f[1] + (float)sin(theta)*u[1]);
-//            neye[2] = len * ((float)cos(theta)*f[2] + (float)sin(theta)*u[2]);
-//
-//            eye[0] = lookat[0] - neye[0];
-//            eye[1] = lookat[1] - neye[1];
-//            eye[2] = lookat[2] - neye[2];
-//
-//            break;
-//    }
-//
-//
-//    last_x = x;
-//    last_y = y;
-//
-//    glutPostRedisplay();
-//}
 
 static void TimeEvent(int te)
 {
@@ -455,6 +445,16 @@ int main(int argc, char **argv)
 //    glui->hide();
 
     vis->create_textures();
+
+
+//    eye[0] = vis->gridWidth/2;
+//    eye[1] = vis->gridHeight/2;
+//    eye[2] = (int) sim->max((float) vis->gridWidth, (float) vis->gridHeight);
+    eye[0] = 0;
+    eye[1] = 0;
+    eye[2] = 100;
+
+    cout <<  vis->gridHeight << endl;
 
     glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
     return 0;

@@ -82,5 +82,6 @@ public:
     void visualize(void);
     void create_textures();
     void do_one_simulation_step();
+    void draw_3d_grid();
 };
 #endif //SCIENTIFIC_VISUALIZATION_VISUALIZATION_H

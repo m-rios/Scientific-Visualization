@@ -33,6 +33,7 @@ rfftwnd_plan plan_rc, plan_cr;  //simulation domain discretization
 //--- VISUALIZATION PARAMETERS ---------------------------------------------------------------------
 int   winWidth, winHeight;      //size of the graphics window, in pixels
 int   gridWidth, gridHeight;    //size of the simulation grid in pixels
+fftw_real  wn, hn;              //size of the grid cell in pixels
 int   color_dir = 0;            //use direction color-coding or not
 float vec_scale = 400;			//scaling of hedgehogs
 int   draw_smoke = 1;           //draw the smoke or not
@@ -50,7 +51,7 @@ int   legend_size = 50;
 
 int   n_colors = 256;           //number of colors used in the color map
 
-int   legend_text_len = 100;
+int   legend_text_len = 85;
 const int DATASET_DENSITY=0;    //Density is the dataset to be displayed
 const int DATASET_VELOCITY=1;   //Velocity is the dataset to be displayed
 const int DATASET_FORCE=2;      //Force is the dataset to be displayed
@@ -64,6 +65,7 @@ unsigned int	textureID[3];
 int texture_mapping = 1;
 int display_divergence = 0;
 int dynamic_scalling = 0;
+int height_plot = 0;
 
 //--- GLUI PARAMETERS ------------------------------------------------------------------------------
 GLUI_RadioGroup *colormap_radio;
@@ -86,6 +88,8 @@ const int RADIO_DATASET = 1;
 const int RADIO_GLYPH = 2;
 
 int spin;
+int left_button = GLUT_UP;  //left button is initially not pressed
+int right_button = GLUT_UP; //right button is initially not pressed
 
 //------ SIMULATION CODE STARTS HERE -----------------------------------------------------------------
 
@@ -346,15 +350,19 @@ void draw_text(const char* text, int x, int y)
     int len = strlen( text );
 
     glColor3f( 1.0f, 1.0f, 1.0f );
-    glRasterPos2f( x, y );
+    glPushMatrix();
+    glTranslatef(x, y, 0.0f);
+    glScalef(0.15, 0.15, 0.15);
     for( int i = 0; i < len; i++ ) {
-        glutBitmapCharacter( GLUT_BITMAP_TIMES_ROMAN_24, text[i] );
+//        glutBitmapCharacter( GLUT_BITMAP_TIMES_ROMAN_24, text[i] );
+        glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, (int) text[i]);
     }
+    glPopMatrix();
 }
 
 void draw_legend(fftw_real min_v, fftw_real max_v)
 {
-    float step = (float) winHeight / (float) n_colors;
+    float step = (float) (winHeight - 2 *hn) / (float) n_colors;
 
     if (texture_mapping) glEnable(GL_TEXTURE_1D);
 
@@ -364,10 +372,10 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
 
         float v = (float) j/((float) (n_colors-1));
 
-        float y0 = step*j;
-        float x0 = winWidth-legend_size-legend_text_len; //do not hardcode legend size
-        float y1 = step*(j+1);
-        float x1 = winWidth-legend_text_len;
+        float y0 = hn+step*j;
+        float x0 = gridWidth; //do not hardcode legend size
+        float y1 = hn+step*(j+1);
+        float x1 = gridWidth + legend_size;
 
         if (texture_mapping)
         {
@@ -383,10 +391,10 @@ void draw_legend(fftw_real min_v, fftw_real max_v)
     }
     if (texture_mapping) glDisable(GL_TEXTURE_1D);
     char string[48];
-    snprintf (string, sizeof(string), "%f", min_v);
-    draw_text(string, winWidth-legend_text_len, 0);
-    snprintf (string, sizeof(string), "%f", max_v);
-    draw_text(string, winWidth-legend_text_len, winHeight-15);
+    snprintf (string, sizeof(string), "%1.3f", min_v);
+    draw_text(string, winWidth-legend_text_len, hn);
+    snprintf (string, sizeof(string), "%1.3f", max_v);
+    draw_text(string, winWidth-legend_text_len, (DIM-1)*hn);
 }
 
 
@@ -436,8 +444,8 @@ void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset)
 //compute_divergence: computes from the x,y vector field the divergence and assigns it to dataset
 void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
 {
-    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
-    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
+//    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
+//    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
     for (int j = 0; j < DIM - 1; j++)
     {
         for (int i = 0; i < DIM - 1; i++)
@@ -503,8 +511,28 @@ void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v)
             dataset[i] = min(clamp_max, dataset[i]);
             dataset[i] = max(clamp_min, dataset[i]);
             dataset[i] = scale(clamp_min, clamp_max, dataset[i]);
+            *min_v = (fftw_real) clamp_min;
+            *max_v = (fftw_real) clamp_max;
         }
     }
+}
+
+void draw_grid()
+{
+    glBegin(GL_LINES);
+    glColor3f(1, 1, 1); //Lines are white
+    // Draw vertical lines
+    for (int i = 0; i < DIM; ++i) {
+        glVertex3f(wn + (fftw_real) i *wn, hn, 0.0);
+        glVertex3f((wn + (fftw_real) i * wn), hn*DIM, 0.0);
+    }
+
+    //Draw horizontal lines
+    for (int j = 0; j < DIM; ++j) {
+        glVertex3f(wn, hn + (fftw_real) j*hn, 0.0);
+        glVertex3f(wn*DIM, hn + (fftw_real) j*hn, 0.0);
+    }
+    glEnd();
 }
 
 void draw_smoke_textures(void)
@@ -523,8 +551,6 @@ void draw_smoke_textures(void)
     glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
 
     int idx;
-    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
-    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
 
     fftw_real min_v, max_v;
     size_t dim = DIM * 2*(DIM/2+1);
@@ -532,7 +558,7 @@ void draw_smoke_textures(void)
     prepare_dataset(dataset, &min_v, &max_v);
 
     int idx0, idx1, idx2, idx3;
-    double px0, py0, px1, py1, px2, py2, px3, py3;
+    double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     glBegin(GL_TRIANGLES);
     for (int j = 0; j < DIM - 1; j++)
     {
@@ -542,21 +568,22 @@ void draw_smoke_textures(void)
             px0 = wn + (fftw_real)i * wn;
             py0 = hn + (fftw_real)j * hn;
             idx0 = (j * DIM) + i;
-
+            if (height_plot) pz0 = dataset[idx0];
 
             px1 = wn + (fftw_real)i * wn;
             py1 = hn + (fftw_real)(j + 1) * hn;
             idx1 = ((j + 1) * DIM) + i;
-
+            if (height_plot) pz1 = dataset[idx1];
 
             px2 = wn + (fftw_real)(i + 1) * wn;
             py2 = hn + (fftw_real)(j + 1) * hn;
             idx2 = ((j + 1) * DIM) + (i + 1);
-
+            if (height_plot) pz2 = dataset[idx2];
 
             px3 = wn + (fftw_real)(i + 1) * wn;
             py3 = hn + (fftw_real)j * hn;
             idx3 = (j * DIM) + (i + 1);
+            if (height_plot) pz3 = dataset[idx3];
 
             fftw_real v0, v1, v2, v3;
 
@@ -565,14 +592,14 @@ void draw_smoke_textures(void)
             v2 = dataset[idx2];
             v3 = dataset[idx3];
 
-            glTexCoord1f(v0);    glVertex2f(px0,py0);
-            glTexCoord1f(v1);    glVertex2f(px1,py1);
-            glTexCoord1f(v2);    glVertex2f(px2,py2);
+            glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
+            glTexCoord1f(v1);    glVertex3f(px1,py1, pz1);
+            glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
 //            glTexCoord1f(v3);    glVertex2f(px3,py3);
 
-            glTexCoord1f(v0);    glVertex2f(px0,py0);
-            glTexCoord1f(v3);    glVertex2f(px3,py3);
-            glTexCoord1f(v2);    glVertex2f(px2,py2);
+            glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
+            glTexCoord1f(v3);    glVertex3f(px3,py3, pz3);
+            glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
 
         }
     }
@@ -584,8 +611,8 @@ void draw_smoke_textures(void)
 void draw_smoke_default()
 {
     int        i, j, idx;
-    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
-    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell height
+//    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
+//    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
 
     fftw_real min_v, max_v;
     size_t dim = DIM * 2*(DIM/2+1);
@@ -838,15 +865,14 @@ void compute_isolines()
 //visualize: This is the main visualization function
 void visualize(void)
 {
-    int        i, j, idx;
-	fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
-	fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
+	int        i, j, idx;
 
     fftw_real min_v, max_v;
     size_t dim = DIM * 2*(DIM/2+1);
     fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
+    if (height_plot) draw_grid();
 
 	if (draw_smoke)
 	{
@@ -1018,6 +1044,10 @@ void divergence_cb( int control )
     }
 }
 
+void enable_height_plot( int control )
+{
+    //Set default perspective and stuff
+}
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
 
@@ -1025,8 +1055,16 @@ void divergence_cb( int control )
 void display(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+//    glMatrixMode(GL_PROJECTION);
+//    glLoadIdentity();
+//    glFrustum(-1, 1, -1, 1, 1, 1000);
+
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+
+//    gluLookAt ( 0.0, 0.0, 10.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0 );
+
     visualize();
 
 	glFlush();
@@ -1036,13 +1074,19 @@ void display(void)
 //reshape: Handle window resizing (reshaping) events
 void reshape(int w, int h)
 {
-	glViewport(0.0f, 0.0f, (GLfloat)w, (GLfloat)h);
+    int tx, ty, tw, th;
+    GLUI_Master.get_viewport_area(&tx, &ty, &tw, &th);
+    glViewport(tx, ty, tw, th);
+
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10.0, 10.0);
-	winWidth = w; winHeight = h;
+    winWidth = w; winHeight = h;
     gridWidth = winWidth - legend_size - legend_text_len;
     gridHeight = winHeight;
+    wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);
+    hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);
+    glutPostRedisplay();
 }
 
 //keyboard: Handle key presses
@@ -1084,48 +1128,187 @@ void keyboard(unsigned char key, int x, int y)
     glui->sync_live(); //Synchronise live variables to update keyboard changes in gui.
 }
 
+void mouseCallback(int button, int state, int x, int y)
+{
+    if (button == GLUT_LEFT_BUTTON)
+        left_button = state;
+    else if (button == GLUT_RIGHT_BUTTON)
+        right_button = state;
+}
 
+//add_matter: When the user drags with the left mouse button pressed, add a force that corresponds to the direction of
+// the mouse cursor movement. Also inject some new matter into the field at the mouse location.
+void add_matter(int mx, int my)
+{
+    int xi,yi,X,Y;
+    double  dx, dy, len;
+    static int lmx=0,lmy=0;				//remembers last mouse location
 
-// drag: When the user drags with the mouse, add a force that corresponds to the direction of the mouse
-//       cursor movement. Also inject some new matter into the field at the mouse location.
+    // Compute the array index that corresponds to the cursor location
+    xi = (int)clamp((double)(DIM + 1) * ((double)mx / (double)gridWidth));
+    yi = (int)clamp((double)(DIM + 1) * ((double)(gridHeight - my) / (double)gridHeight));
+
+    X = xi;
+    Y = yi;
+
+    if (X > (DIM - 1))
+        X = DIM - 1;
+    if (Y > (DIM - 1))
+        Y = DIM - 1;
+    if (X < 0)
+        X = 0;
+    if (Y < 0)
+        Y = 0;
+
+    // Add force at the cursor location
+    my = winHeight - my;
+    dx = mx - lmx;
+    dy = my - lmy;
+    len = sqrt(dx * dx + dy * dy);
+    if (len != 0.0)
+    {
+        dx *= 0.1 / len;
+        dy *= 0.1 / len;
+    }
+    fx[Y * DIM + X] += dx;
+    fy[Y * DIM + X] += dy;
+    rho[Y * DIM + X] = 10.0f;
+    lmx = mx;
+    lmy = my;
+}
+
+int orbit_view(int mx, int my)
+{
+
+}
+
+// drag: select which action to map mouse drag to, depending on pressed button
 void drag(int mx, int my)
 {
-	int xi,yi,X,Y;
-	double  dx, dy, len;
-	static int lmx=0,lmy=0;				//remembers last mouse location
+	if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
+    glutSetWindow(glui->get_glut_window_id());
 
-	// Compute the array index that corresponds to the cursor location
-	xi = (int)clamp((double)(DIM + 1) * ((double)mx / (double)gridWidth));
-	yi = (int)clamp((double)(DIM + 1) * ((double)(gridHeight - my) / (double)gridHeight));
+//    mx -= 150;
 
-	X = xi;
-	Y = yi;
-
-	if (X > (DIM - 1))
-		X = DIM - 1;
-	if (Y > (DIM - 1))
-		Y = DIM - 1;
-	if (X < 0)
-		X = 0;
-	if (Y < 0)
-		Y = 0;
-
-	// Add force at the cursor location
-	my = winHeight - my;
-	dx = mx - lmx;
-	dy = my - lmy;
-	len = sqrt(dx * dx + dy * dy);
-	if (len != 0.0)
-	{
-		dx *= 0.1 / len;
-		dy *= 0.1 / len;
-	}
-	fx[Y * DIM + X] += dx;
-	fy[Y * DIM + X] += dy;
-	rho[Y * DIM + X] = 10.0f;
-	lmx = mx;
-	lmy = my;
+    if (left_button == GLUT_DOWN)
+        add_matter(mx, my);
+    else if (right_button == GLUT_DOWN)
+        orbit_view(mx, my);
 }
+
+//void myGlutMotion(int x, int y)
+//{
+//    // the change in mouse position
+//    int dx = x-last_x;
+//    int dy = y-last_y;
+//
+//    float scale, len, theta;
+//    float neye[3], neye2[3];
+//    float f[3], r[3], u[3];
+//
+//    switch(cur_button)
+//    {
+//        case GLUT_LEFT_BUTTON:
+//            // translate
+//            f[0] = lookat[0] - eye[0];
+//            f[1] = lookat[1] - eye[1];
+//            f[2] = lookat[2] - eye[2];
+//            u[0] = 0;
+//            u[1] = 1;
+//            u[2] = 0;
+//
+//            // scale the change by how far away we are
+//            scale = sqrt(length(f)) * 0.007;
+//
+//            crossproduct(f, u, r);
+//            crossproduct(r, f, u);
+//            normalize(r);
+//            normalize(u);
+//
+//            eye[0] += -r[0]*dx*scale + u[0]*dy*scale;
+//            eye[1] += -r[1]*dx*scale + u[1]*dy*scale;
+//            eye[2] += -r[2]*dx*scale + u[2]*dy*scale;
+//
+//            lookat[0] += -r[0]*dx*scale + u[0]*dy*scale;
+//            lookat[1] += -r[1]*dx*scale + u[1]*dy*scale;
+//            lookat[2] += -r[2]*dx*scale + u[2]*dy*scale;
+//
+//            break;
+//
+//        case GLUT_MIDDLE_BUTTON:
+//            // zoom
+//            f[0] = lookat[0] - eye[0];
+//            f[1] = lookat[1] - eye[1];
+//            f[2] = lookat[2] - eye[2];
+//
+//            len = length(f);
+//            normalize(f);
+//
+//            // scale the change by how far away we are
+//            len -= sqrt(len)*dx*0.03;
+//
+//            eye[0] = lookat[0] - len*f[0];
+//            eye[1] = lookat[1] - len*f[1];
+//            eye[2] = lookat[2] - len*f[2];
+//
+//            // make sure the eye and lookat points are sufficiently far away
+//            // push the lookat point forward if it is too close
+//            if (len < 1)
+//            {
+//                printf("lookat move: %f\n", len);
+//                lookat[0] = eye[0] + f[0];
+//                lookat[1] = eye[1] + f[1];
+//                lookat[2] = eye[2] + f[2];
+//            }
+//
+//            break;
+//
+//        case GLUT_RIGHT_BUTTON:
+//            // rotate
+//
+//            neye[0] = eye[0] - lookat[0];
+//            neye[1] = eye[1] - lookat[1];
+//            neye[2] = eye[2] - lookat[2];
+//
+//            // first rotate in the x/z plane
+//            theta = -dx * 0.007;
+//            neye2[0] = (float)cos(theta)*neye[0] + (float)sin(theta)*neye[2];
+//            neye2[1] = neye[1];
+//            neye2[2] =-(float)sin(theta)*neye[0] + (float)cos(theta)*neye[2];
+//
+//
+//            // now rotate vertically
+//            theta = -dy * 0.007;
+//
+//            f[0] = -neye2[0];
+//            f[1] = -neye2[1];
+//            f[2] = -neye2[2];
+//            u[0] = 0;
+//            u[1] = 1;
+//            u[2] = 0;
+//            crossproduct(f, u, r);
+//            crossproduct(r, f, u);
+//            len = length(f);
+//            normalize(f);
+//            normalize(u);
+//
+//            neye[0] = len * ((float)cos(theta)*f[0] + (float)sin(theta)*u[0]);
+//            neye[1] = len * ((float)cos(theta)*f[1] + (float)sin(theta)*u[1]);
+//            neye[2] = len * ((float)cos(theta)*f[2] + (float)sin(theta)*u[2]);
+//
+//            eye[0] = lookat[0] - neye[0];
+//            eye[1] = lookat[1] - neye[1];
+//            eye[2] = lookat[2] - neye[2];
+//
+//            break;
+//    }
+//
+//
+//    last_x = x;
+//    last_y = y;
+//
+//    glutPostRedisplay();
+//}
 
 static void TimeEvent(int te)
 {
@@ -1161,7 +1344,8 @@ int main(int argc, char **argv)
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-	glutInitWindowSize(950,900);
+    winWidth = 900; winHeight = 900;
+	glutInitWindowSize(winWidth,winHeight);
     glutInitWindowPosition( 50, 50 );
 
 
@@ -1169,6 +1353,7 @@ int main(int argc, char **argv)
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
 	glutMotionFunc(drag);
+    glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
     glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
@@ -1185,13 +1370,6 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( dataset_radio, "Density" );
     new GLUI_RadioButton( dataset_radio, "Velocity" );
     new GLUI_RadioButton( dataset_radio, "Force" );
-
-//    button = new GLUI_Button(glui, "View Glyphs", 5, glyph_button_cb);
-//    GLUI_Panel *glyphscalar_panel = new GLUI_Panel( glui, "scalar value for glyph" );
-//    glyph_radio = new GLUI_RadioGroup(glyphscalar_panel, (&sGlyph), 4, control_cb);
-//    new GLUI_RadioButton( glyph_radio, "rho" );
-//    new GLUI_RadioButton( glyph_radio, "||v||" );
-//    new GLUI_RadioButton( glyph_radio, "||f||" );
 
     GLUI_Panel *glyphvector_panel = new GLUI_Panel( glui, "vector value for glyph" );
     glyph_radio = new GLUI_RadioGroup(glyphvector_panel , (&vGlyph), RADIO_GLYPH, radio_cb);
@@ -1218,6 +1396,8 @@ int main(int argc, char **argv)
 	glui->add_checkbox("Show divergence", &display_divergence, -1, divergence_cb);
     glui->add_checkbox("Render smoke", &draw_smoke);
     glui->add_checkbox("Render glyphs", &draw_vecs);
+    glui->add_checkbox("Height plot", &height_plot, -1, enable_height_plot);
+
     glui->add_checkbox("Render Isolines", &draw_iLines);
     printf("Clamp max initial value: %f",clamp_max);
 
@@ -1233,6 +1413,7 @@ int main(int argc, char **argv)
     glui->set_main_gfx_window( main_window );
     GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
 
+//    glui->hide();
 
 	init_simulation(DIM);	//initialize the simulation data structures
     create_textures();
@@ -1240,9 +1421,3 @@ int main(int argc, char **argv)
 	glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
 	return 0;
 }
-
-//TODO:
-//
-//- texture color mapping from book example.
-//- check equation 5.1, maybe clamping and scalling can be implemented directly by colormap function using the formula, the
-//    only difference is the input of the min/max values (dataset determined for scaling, user for clamping).
