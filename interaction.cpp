@@ -90,26 +90,9 @@ void enable_height_plot( int control )
     {
         glEnable(GL_DEPTH_TEST);
 
-        eye[0] = 0;
-        eye[1] = 0;
-        eye[2] = 100;
-
-        lookat[0] = vis->gridWidth/2.0f;
-        lookat[1] = vis->gridHeight/2.0f;
-    }
-    else //set default view
-    {
-//        glDisable(GL_DEPTH_TEST);
-//        eye[0] = vis->gridWidth/2.0f;
-//        eye[1] = vis->gridHeight/2.0f;
-//        eye[2] = 100;
-//
-//        lookat[0] = vis->gridWidth/2.0f;
-//        lookat[1] = vis->gridHeight/2.0f;
-
-        eye[0] = vis->gridWidth/2.0f-1;
-        eye[1] = vis->gridHeight/2.0f;
-        eye[2] = 1000;
+        eye[0] = -200;
+        eye[1] = -200;
+        eye[2] = 500;
 
         lookat[0] = vis->gridWidth/2.0f;
         lookat[1] = vis->gridHeight/2.0f;
@@ -152,9 +135,6 @@ void reshape(int w, int h)
     GLUI_Master.get_viewport_area(&tx, &ty, &tw, &th);
     glViewport(tx, ty, tw, th);
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10.0, 10.0);
     vis->winWidth = w; vis->winHeight = h;
     vis->gridWidth = vis->winWidth - vis->legend_size - vis->legend_text_len;
     vis->gridHeight = vis->winHeight;
