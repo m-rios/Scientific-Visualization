@@ -7,6 +7,10 @@
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
+
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 }
 
 //rainbow: Implements a color palette, mapping the scalar 'value' to a rainbow color RGB
@@ -100,7 +104,7 @@ void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
 //    glMatrixMode(GL_PROJECTION);
     float step = (float) (winHeight - 2 *hn) / (float) n_colors;
 
-    if (texture_mapping) glEnable(GL_TEXTURE_1D);
+    glEnable(GL_TEXTURE_1D);
 
     for (int j = 0; j < n_colors; ++j)
     {
@@ -113,19 +117,12 @@ void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
         float y1 = hn+step*(j+1);
         float x1 = gridWidth + legend_size;
 
-        if (texture_mapping)
-        {
-            glTexCoord1f(v);
-        }
-        else
-        {
-            set_colormap(v);
-        }
+        glTexCoord1f(v);
 
         glRecti(x0,y0,x1,y1);
 
     }
-    if (texture_mapping) glDisable(GL_TEXTURE_1D);
+    glDisable(GL_TEXTURE_1D);
     char string[48];
     snprintf (string, sizeof(string), "%1.3f", min_v);
     draw_text(string, winWidth-legend_text_len, hn);
@@ -253,87 +250,131 @@ void Visualization::prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_r
     }
 }
 
-void Visualization::draw_grid()
-{
-    glBegin(GL_LINES);
-    glColor3f(1, 1, 1); //Lines are white
-    // Draw vertical lines
-    for (int i = 0; i < sim->DIM; ++i) {
-        glVertex3f(wn + (fftw_real) i *wn, hn, 0.0);
-        glVertex3f((wn + (fftw_real) i * wn), hn*sim->DIM, 0.0);
-    }
-
-    //Draw horizontal lines
-    for (int j = 0; j < sim->DIM; ++j) {
-        glVertex3f(wn, hn + (fftw_real) j*hn, 0.0);
-        glVertex3f(wn*sim->DIM, hn + (fftw_real) j*hn, 0.0);
-    }
-    glEnd();
-}
-
 void Visualization::draw_3d_grid()
 {
     glBegin(GL_LINES);
     glColor3f(1,1,1);
 
-    int size = (int) sim->max((float) gridWidth, (float) gridHeight);
+    //Draw bottom grid
+    // Draw vertical lines
+    for (int i = 0; i < sim->DIM; ++i)
+    {
+        glVertex3f(wn + (fftw_real) i *wn, hn, 0.0);
+        glVertex3f((wn + (fftw_real) i * wn), hn*sim->DIM, 0.0);
+    }
 
-    //Draw simple cube outline
-    //Base
-    glVertex3f(0, 0, 0);
-    glVertex3f(size, 0, 0);
-
-    glVertex3f(size, 0, 0);
-    glVertex3f(size, size, 0);
-
-    glVertex3f(size, size, 0);
-    glVertex3f(0, size, 0);
-
-    glVertex3f(0, size, 0);
-    glVertex3f(0, 0, 0);
+    //Draw horizontal lines
+    for (int j = 0; j < sim->DIM; ++j)
+    {
+        glVertex3f(wn, hn + (fftw_real) j*hn, 0.0);
+        glVertex3f(wn*sim->DIM, hn + (fftw_real) j*hn, 0.0);
+    }
 
     //Front
-    glVertex3f(0, 0, 0);
-    glVertex3f(0, 0, size);
+    glVertex3f(wn , hn, 0);
+    glVertex3f(wn, hn, hp_height);
 
-    glVertex3f(size, 0, 0);
-    glVertex3f(size, 0, size);
+    glVertex3f(wn + (sim->DIM -1)*wn, hn, 0);
+    glVertex3f(wn + (sim->DIM -1)*wn, hn, hp_height);
 
     //Left
-    glVertex3f(size, size, 0);
-    glVertex3f(size, size, size);
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, 0);
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, hp_height);
 
     //Right
-    glVertex3f(0, size, 0);
-    glVertex3f(0, size, size);
+    glVertex3f(wn + (sim->DIM - 1)*wn, hn + (sim->DIM -1) * hn, 0);
+    glVertex3f(wn + (sim->DIM - 1)*wn, hn + (sim->DIM -1) * hn, hp_height);
+
+    //Top
+    glVertex3f(wn, hn, hp_height);
+    glVertex3f(wn + (sim->DIM -1) * wn, hn, hp_height);
+
+    glVertex3f(wn + (sim->DIM -1) * wn, hn, hp_height);
+    glVertex3f(wn + (sim->DIM -1) * wn, hn + (sim->DIM -1) * hn, hp_height);
+
+    glVertex3f(wn + (sim->DIM -1) * wn, hn + (sim->DIM -1) * hn, hp_height);
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, hp_height);
+
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, hp_height);
+    glVertex3f(wn, hn, hp_height);
+
+    //Draw marks
+    int nsteps = 4;
+    int mark_size = 2;
+
+    for (int i = 1; i < nsteps; ++i) //start at 1 because we don't want to draw at height 0
+    {
+        int height = (hp_height / nsteps)*i;
+        //Front
+        glVertex3d( wn, hn, height);
+        glVertex3d( wn + wn * mark_size, hn, height);
+
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn - wn * mark_size, hn, height);
+
+        //Left
+        glVertex3d( wn, hn, height);
+        glVertex3d( wn, hn + hn * mark_size, height);
+
+        glVertex3d( wn, hn + (sim->DIM - 1)*hn - hn * mark_size, height);
+        glVertex3d( wn, hn + (sim->DIM - 1)*hn, height);
+
+        //Right
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + hn * mark_size, height);
+
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + (sim->DIM - 1)*hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + (sim->DIM - 1)*hn - hn * mark_size, height);
+
+        //Back
+        glVertex3d( wn, hn + (sim->DIM - 1)*hn, height);
+        glVertex3d( wn + wn * mark_size, hn + (sim->DIM - 1)*hn, height);
+
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + (sim->DIM - 1)*hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn - wn * mark_size, hn + (sim->DIM - 1)*hn, height);
+    }
+
     glEnd();
 }
 
-void Visualization::draw_smoke_textures(void)
+void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v)
 {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glDisable(GL_LIGHTING);
+//    glDisable(GL_LIGHTING);
+//    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
     glShadeModel(GL_SMOOTH);
 
     glEnable(GL_TEXTURE_1D);
-    //     to the currently-active colormap.
     glBindTexture(GL_TEXTURE_1D,textureID[scalar_col]);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
+    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
 
-    int idx;
-
-    fftw_real min_v, max_v;
+    //Prepare dataset for height plot if enabled
     size_t dim = sim->DIM * 2*(sim->DIM/2+1);
-    fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
-    prepare_dataset(dataset, &min_v, &max_v);
+    fftw_real* height_dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
 
-    int idx0, idx1, idx2, idx3;
+    if (height_plot)
+    {
+        int old_display_dataset = display_dataset;
+        int old_apply_mode = apply_mode;
+
+        display_dataset = hp_display_dataset;
+        apply_mode = APPLY_CLAMP;
+        fftw_real dont_care;
+        prepare_dataset(height_dataset, &dont_care, &dont_care); //scale, clamp or compute magnitude for the required dataset
+
+        display_dataset = old_display_dataset;
+        apply_mode = old_apply_mode;
+    }
+
+    int idx, idx0, idx1, idx2, idx3;
     double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     glBegin(GL_TRIANGLES);
+//    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
     for (int j = 0; j < sim->DIM - 1; j++)
     {
         for (int i = 0; i < sim->DIM - 1; i++)
@@ -342,22 +383,22 @@ void Visualization::draw_smoke_textures(void)
             px0 = wn + (fftw_real)i * wn;
             py0 = hn + (fftw_real)j * hn;
             idx0 = (j * sim->DIM) + i;
-            if (height_plot) pz0 = dataset[idx0]*20;
+            if (height_plot) pz0 = height_dataset[idx0]*hp_height;
 
             px1 = wn + (fftw_real)i * wn;
             py1 = hn + (fftw_real)(j + 1) * hn;
             idx1 = ((j + 1) * sim->DIM) + i;
-            if (height_plot) pz1 = dataset[idx1]*20;
+            if (height_plot) pz1 = height_dataset[idx1]*hp_height;
 
             px2 = wn + (fftw_real)(i + 1) * wn;
             py2 = hn + (fftw_real)(j + 1) * hn;
             idx2 = ((j + 1) * sim->DIM) + (i + 1);
-            if (height_plot) pz2 = dataset[idx2]*20;
+            if (height_plot) pz2 = height_dataset[idx2]*hp_height;
 
             px3 = wn + (fftw_real)(i + 1) * wn;
             py3 = hn + (fftw_real)j * hn;
             idx3 = (j * sim->DIM) + (i + 1);
-            if (height_plot) pz3 = dataset[idx3]*20;
+            if (height_plot) pz3 = height_dataset[idx3]*hp_height;
 
             fftw_real v0, v1, v2, v3;
 
@@ -369,7 +410,6 @@ void Visualization::draw_smoke_textures(void)
             glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
             glTexCoord1f(v1);    glVertex3f(px1,py1, pz1);
             glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
-//            glTexCoord1f(v3);    glVertex2f(px3,py3);
 
             glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
             glTexCoord1f(v3);    glVertex3f(px3,py3, pz3);
@@ -379,65 +419,7 @@ void Visualization::draw_smoke_textures(void)
     }
     glEnd();
     glDisable(GL_TEXTURE_1D);
-    draw_legend(min_v, max_v);
-}
-
-void Visualization::draw_smoke_default()
-{
-    int        i, j, idx;
-//    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(sim->DIM + 1);   // Grid cell width
-//    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(sim->DIM + 1);  // Grid cell heigh
-
-    fftw_real min_v, max_v;
-    size_t dim = sim->DIM * 2*(sim->DIM/2+1);
-    fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
-    prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
-
-    int idx0, idx1, idx2, idx3;
-    double px0, py0, px1, py1, px2, py2, px3, py3;
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glBegin(GL_TRIANGLES);
-    for (j = 0; j < sim->DIM - 1; j++)            //draw smoke
-    {
-        for (i = 0; i < sim->DIM - 1; i++)
-        {
-            px0 = wn + (fftw_real)i * wn;
-            py0 = hn + (fftw_real)j * hn;
-            idx0 = (j * sim->DIM) + i;
-
-
-            px1 = wn + (fftw_real)i * wn;
-            py1 = hn + (fftw_real)(j + 1) * hn;
-            idx1 = ((j + 1) * sim->DIM) + i;
-
-
-            px2 = wn + (fftw_real)(i + 1) * wn;
-            py2 = hn + (fftw_real)(j + 1) * hn;
-            idx2 = ((j + 1) * sim->DIM) + (i + 1);
-
-
-            px3 = wn + (fftw_real)(i + 1) * wn;
-            py3 = hn + (fftw_real)j * hn;
-            idx3 = (j * sim->DIM) + (i + 1);
-
-            fftw_real v0, v1, v2, v3;
-
-            v0 = dataset[idx0];
-            v1 = dataset[idx1];
-            v2 = dataset[idx2];
-            v3 = dataset[idx3];
-
-            set_colormap(v0);    glVertex2f(px0, py0);
-            set_colormap(v1);    glVertex2f(px1, py1);
-            set_colormap(v2);    glVertex2f(px2, py2);
-
-
-            set_colormap(v0);    glVertex2f(px0, py0);
-            set_colormap(v2);    glVertex2f(px2, py2);
-            set_colormap(v3);    glVertex2f(px3, py3);
-        }
-    }
-    glEnd();
+//    glEnable(GL_COLOR_MATERIAL);
     draw_legend(min_v, max_v);
 }
 
@@ -451,18 +433,11 @@ void Visualization::visualize(void)
     fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
-    if (height_plot) draw_grid();
-
-	if (draw_smoke)
-	{
-        if (texture_mapping)
-            draw_smoke_textures();
-        else
-            draw_smoke_default();
-    }
-
     if (height_plot)
         draw_3d_grid();
+
+	if (draw_smoke)
+        draw_smoke_surface(dataset, min_v, max_v);
 
 	if (draw_vecs)
 	{

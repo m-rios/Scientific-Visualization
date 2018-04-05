@@ -54,7 +54,6 @@ public:
     float clamp_min = 0.0f;
     float clamp_max = 1.0f;
     unsigned int	textureID[3];
-    int texture_mapping = 1;
     int display_divergence = 0;
     int dynamic_scalling = 0;
     int height_plot = 0;
@@ -62,6 +61,12 @@ public:
     int vGlyph = 0;
     int sGlyph = 0;
     int typeGlyph = 0;
+    int hp_height = 250;
+    int hp_display_dataset = 0;
+
+    GLfloat light_ambient[4] = { 0.0, 0.0, 0.0, 1.0 };
+    GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
 
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);
@@ -76,9 +81,7 @@ public:
     void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset);
     void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset);
     void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v);
-    void draw_grid();
-    void draw_smoke_textures(void);
-    void draw_smoke_default();
+    void draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v);
     void visualize(void);
     void create_textures();
     void do_one_simulation_step();

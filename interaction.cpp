@@ -10,6 +10,7 @@
 GLUI_RadioGroup *colormap_radio;
 GLUI_RadioGroup *glyphtype;
 GLUI_RadioGroup *dataset_radio;
+GLUI_RadioGroup *hp_dataset_radio;
 GLUI_RadioGroup *glyph_radio;
 GLUI_Button *button;
 int   main_window;
@@ -17,10 +18,12 @@ GLUI *glui_v_subwindow;
 int segments = 0;
 GLUI_Spinner *clamp_max_spinner;
 GLUI_Spinner *clamp_min_spinner;
+GLUI_Spinner *height_spinner;
 GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
 const int RADIO_GLYPH = 2;
+const int RADIO_HP_DATASET = 3;
 int spin;
 int left_button = GLUT_UP;  //left button is initially not pressed
 int right_button = GLUT_UP; //right button is initially not pressed
@@ -42,6 +45,7 @@ void radio_cb( int control )
         case RADIO_COLOR_MAP:   vis->scalar_col = colormap_radio->get_int_val();         break;
         case RADIO_DATASET:     vis->display_dataset = dataset_radio->get_int_val();     break;
         case RADIO_GLYPH:       vis->vGlyph = (glyph_radio->get_int_val());              break;
+        case RADIO_HP_DATASET:     vis->hp_display_dataset = hp_dataset_radio->get_int_val();     break;
     }
 }
 
@@ -82,7 +86,34 @@ void divergence_cb( int control )
 
 void enable_height_plot( int control )
 {
-    //Set default perspective and stuff
+    if (vis->height_plot)
+    {
+        glEnable(GL_DEPTH_TEST);
+
+        eye[0] = 0;
+        eye[1] = 0;
+        eye[2] = 100;
+
+        lookat[0] = vis->gridWidth/2.0f;
+        lookat[1] = vis->gridHeight/2.0f;
+    }
+    else //set default view
+    {
+//        glDisable(GL_DEPTH_TEST);
+//        eye[0] = vis->gridWidth/2.0f;
+//        eye[1] = vis->gridHeight/2.0f;
+//        eye[2] = 100;
+//
+//        lookat[0] = vis->gridWidth/2.0f;
+//        lookat[1] = vis->gridHeight/2.0f;
+
+        eye[0] = vis->gridWidth/2.0f-1;
+        eye[1] = vis->gridHeight/2.0f;
+        eye[2] = 1000;
+
+        lookat[0] = vis->gridWidth/2.0f;
+        lookat[1] = vis->gridHeight/2.0f;
+    }
 }
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
@@ -94,15 +125,20 @@ void display(void)
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glFrustum(-.5, .5, -.5, .5, 1, 10000);
+    if (vis->height_plot)
+        glFrustum(-.5, .5, -.5, .5, 1, 10000);
+    else
+        glOrtho(0.0, (GLdouble)vis->winWidth, 0.0, (GLdouble)vis->winHeight, -10.0, 10.0);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    if (vis->height_plot) {
-        gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
+    if (vis->height_plot)
+    {
         vis->draw_3d_grid();
+        gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
     }
 
+    glEnable(GL_LIGHTING);
     vis->visualize();
 
     glFlush();
@@ -125,8 +161,13 @@ void reshape(int w, int h)
     vis->wn = (fftw_real)vis->gridWidth  / (fftw_real)(sim->DIM + 1);
     vis->hn = (fftw_real)vis->gridHeight / (fftw_real)(sim->DIM + 1);
 
-    lookat[0] = vis->gridWidth/2.0f;
-    lookat[1] = vis->gridHeight/2.0f;
+    if (vis->height_plot)
+    {
+        lookat[0] = vis->gridWidth/2.0f;
+        lookat[1] = vis->gridHeight/2.0f;
+        GLfloat light_position[] = {lookat[0], lookat[1], 500.0, 1.0};
+        glLightfv(GL_LIGHT0, GL_POSITION, light_position );
+    }
 
     glutPostRedisplay();
 }
@@ -258,14 +299,13 @@ int orbit_view(int mx, int my)
     neye[1] = eye[1] - lookat[1];
     neye[2] = eye[2] - lookat[2];
 
-    // first rotate in the x/z plane
+    //rotate around z
     float theta = -dx * 0.007;
     neye2[0] = cos(theta)*neye[0] + sin(theta)*neye[1];
     neye2[1] = -sin(theta)*neye[0] + cos(theta)*neye[1];
     neye2[2] = eye[2];
 
-
-    // now rotate vertically
+    //rotate around x
     theta = -dy * 0.007;
 
     f[0] = -neye2[0];
@@ -293,16 +333,21 @@ int orbit_view(int mx, int my)
 
 void zoom(int my)
 {
-    int dy = (my - last_my)*0.5;
-    float neye[3]; //normalized eye, for scaling purposes
-    neye[0] = eye[0];
-    neye[1] = eye[1];
-    neye[2] = eye[2];
-    normalize(neye);
+    int dy = -(my - last_my)*0.005;
+    float eye_lookat[3];
+    eye_lookat[0] = eye[0] - lookat[0];
+    eye_lookat[1] = eye[1] - lookat[1];
+    eye_lookat[2] = eye[2] - lookat[2];
 
-    eye[0] = eye[0] + neye[0]*dy;
-    eye[1] = eye[1] + neye[1]*dy;
-    eye[2] = eye[2] + neye[2]*dy;
+    float len = length(eye_lookat);
+
+    normalize(eye_lookat);
+
+    len -= sqrt(len)*dy*0.1;
+
+    eye[0] = lookat[0] + eye_lookat[0]*len;
+    eye[1] = lookat[1] + eye_lookat[1]*len;
+    eye[2] = lookat[2] + eye_lookat[2]*len;
 }
 
 // drag: select which action to map mouse drag to, depending on pressed button
@@ -424,12 +469,20 @@ int main(int argc, char **argv)
     clamp_max_spinner->set_float_val(1.0f);
     clamp_min_spinner->set_float_val(0.0f);
 
-    glui->add_checkbox("Use texture mapping", &vis->texture_mapping);
     glui->add_checkbox("Dynamic scaling", &vis->dynamic_scalling);
     glui->add_checkbox("Show divergence", &vis->display_divergence, -1, divergence_cb);
     glui->add_checkbox("Render smoke", &vis->draw_smoke);
     glui->add_checkbox("Render glyphs", &vis->draw_vecs);
-    glui->add_checkbox("Height plot", &vis->height_plot, -1, enable_height_plot);
+
+    GLUI_Panel *height_plot_panel = new GLUI_Panel(glui, "Height plot options");
+    glui->add_checkbox_to_panel(height_plot_panel, "Height plot", &vis->height_plot, -1, enable_height_plot);
+    hp_dataset_radio = new GLUI_RadioGroup(height_plot_panel, (&vis->hp_display_dataset), RADIO_HP_DATASET, radio_cb);
+    new GLUI_RadioButton( hp_dataset_radio, "Density" );
+    new GLUI_RadioButton( hp_dataset_radio, "Velocity" );
+    new GLUI_RadioButton( hp_dataset_radio, "Force" );
+    height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height);
+    height_spinner->set_int_limits(50, 300);
+
 
     GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &vis->n_colors, -1, color_bands_cb);
     color_bands_spinner->set_int_limits(3, 256);
@@ -442,14 +495,8 @@ int main(int argc, char **argv)
     glui->set_main_gfx_window( main_window );
     GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
 
-//    glui->hide();
-
     vis->create_textures();
 
-
-//    eye[0] = vis->gridWidth/2;
-//    eye[1] = vis->gridHeight/2;
-//    eye[2] = (int) sim->max((float) vis->gridWidth, (float) vis->gridHeight);
     eye[0] = 0;
     eye[1] = 0;
     eye[2] = 100;
