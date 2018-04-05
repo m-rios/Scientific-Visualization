@@ -7,6 +7,10 @@
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
+
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 }
 
 //rainbow: Implements a color palette, mapping the scalar 'value' to a rainbow color RGB
@@ -333,20 +337,21 @@ void Visualization::draw_3d_grid()
     glEnd();
 }
 
-void Visualization::draw_smoke_textures(fftw_real* dataset, fftw_real min_v, fftw_real max_v)
+void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v)
 {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glDisable(GL_LIGHTING);
+//    glDisable(GL_LIGHTING);
+//    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
     glShadeModel(GL_SMOOTH);
 
     glEnable(GL_TEXTURE_1D);
-    //     to the currently-active colormap.
     glBindTexture(GL_TEXTURE_1D,textureID[scalar_col]);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
+    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
 
     //Prepare dataset for height plot if enabled
     size_t dim = sim->DIM * 2*(sim->DIM/2+1);
@@ -369,6 +374,7 @@ void Visualization::draw_smoke_textures(fftw_real* dataset, fftw_real min_v, fft
     int idx, idx0, idx1, idx2, idx3;
     double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     glBegin(GL_TRIANGLES);
+//    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
     for (int j = 0; j < sim->DIM - 1; j++)
     {
         for (int i = 0; i < sim->DIM - 1; i++)
@@ -413,6 +419,7 @@ void Visualization::draw_smoke_textures(fftw_real* dataset, fftw_real min_v, fft
     }
     glEnd();
     glDisable(GL_TEXTURE_1D);
+//    glEnable(GL_COLOR_MATERIAL);
     draw_legend(min_v, max_v);
 }
 
@@ -430,7 +437,7 @@ void Visualization::visualize(void)
         draw_3d_grid();
 
 	if (draw_smoke)
-        draw_smoke_textures(dataset, min_v, max_v);
+        draw_smoke_surface(dataset, min_v, max_v);
 
 	if (draw_vecs)
 	{

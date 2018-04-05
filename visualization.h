@@ -64,6 +64,10 @@ public:
     int hp_height = 250;
     int hp_display_dataset = 0;
 
+    GLfloat light_ambient[4] = { 0.0, 0.0, 0.0, 1.0 };
+    GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
+
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);
     void heatmap(float value, float* R, float* G, float* B);
@@ -77,9 +81,7 @@ public:
     void find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* dataset);
     void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset);
     void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v);
-    void draw_grid();
-    void draw_smoke_textures(fftw_real* dataset, fftw_real min_v, fftw_real max_v);
-    void draw_smoke_default();
+    void draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v);
     void visualize(void);
     void create_textures();
     void do_one_simulation_step();

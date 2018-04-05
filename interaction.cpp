@@ -18,6 +18,7 @@ GLUI *glui_v_subwindow;
 int segments = 0;
 GLUI_Spinner *clamp_max_spinner;
 GLUI_Spinner *clamp_min_spinner;
+GLUI_Spinner *height_spinner;
 GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
@@ -98,13 +99,20 @@ void enable_height_plot( int control )
     }
     else //set default view
     {
-        glDisable(GL_DEPTH_TEST);
-        eye[0] = 0;
-        eye[1] = 0;
-        eye[2] = 10;
+//        glDisable(GL_DEPTH_TEST);
+//        eye[0] = vis->gridWidth/2.0f;
+//        eye[1] = vis->gridHeight/2.0f;
+//        eye[2] = 100;
+//
+//        lookat[0] = vis->gridWidth/2.0f;
+//        lookat[1] = vis->gridHeight/2.0f;
 
-        lookat[0] = 0;
-        lookat[1] = 0;
+        eye[0] = vis->gridWidth/2.0f-1;
+        eye[1] = vis->gridHeight/2.0f;
+        eye[2] = 1000;
+
+        lookat[0] = vis->gridWidth/2.0f;
+        lookat[1] = vis->gridHeight/2.0f;
     }
 }
 
@@ -117,14 +125,20 @@ void display(void)
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glFrustum(-.5, .5, -.5, .5, 1, 10000);
+    if (vis->height_plot)
+        glFrustum(-.5, .5, -.5, .5, 1, 10000);
+    else
+        glOrtho(0.0, (GLdouble)vis->winWidth, 0.0, (GLdouble)vis->winHeight, -10.0, 10.0);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+    if (vis->height_plot)
+    {
+        vis->draw_3d_grid();
+        gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
+    }
 
-    vis->draw_3d_grid();
-    gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
-
+    glEnable(GL_LIGHTING);
     vis->visualize();
 
     glFlush();
@@ -151,6 +165,8 @@ void reshape(int w, int h)
     {
         lookat[0] = vis->gridWidth/2.0f;
         lookat[1] = vis->gridHeight/2.0f;
+        GLfloat light_position[] = {lookat[0], lookat[1], 500.0, 1.0};
+        glLightfv(GL_LIGHT0, GL_POSITION, light_position );
     }
 
     glutPostRedisplay();
@@ -317,7 +333,7 @@ int orbit_view(int mx, int my)
 
 void zoom(int my)
 {
-    int dy = (my - last_my)*0.005;
+    int dy = -(my - last_my)*0.005;
     float eye_lookat[3];
     eye_lookat[0] = eye[0] - lookat[0];
     eye_lookat[1] = eye[1] - lookat[1];
@@ -337,12 +353,12 @@ void zoom(int my)
 // drag: select which action to map mouse drag to, depending on pressed button
 void drag(int mx, int my)
 {
-//    if (!vis->height_plot)
-//    {
-//       add_matter(mx, my);
-//    }
-//    else
-//    {
+    if (!vis->height_plot)
+    {
+       add_matter(mx, my);
+    }
+    else
+    {
        if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
        glutSetWindow(glui->get_glut_window_id());
 
@@ -356,7 +372,7 @@ void drag(int mx, int my)
                orbit_view(mx, my);
        }
 
-//    }
+    }
 }
 
 void do_one_simulation_step()
@@ -464,6 +480,8 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( hp_dataset_radio, "Density" );
     new GLUI_RadioButton( hp_dataset_radio, "Velocity" );
     new GLUI_RadioButton( hp_dataset_radio, "Force" );
+    height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height);
+    height_spinner->set_int_limits(50, 300);
 
 
     GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &vis->n_colors, -1, color_bands_cb);
@@ -476,8 +494,6 @@ int main(int argc, char **argv)
 
     glui->set_main_gfx_window( main_window );
     GLUI_Master.set_glutIdleFunc(do_one_simulation_step);
-
-//    glui->hide();
 
     vis->create_textures();
 
