@@ -62,6 +62,7 @@ public:
     int vGlyph = 0;
     int sGlyph = 0;
     int typeGlyph = 0;
+    int hp_height = 250;
 
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);

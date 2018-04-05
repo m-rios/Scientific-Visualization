@@ -82,7 +82,27 @@ void divergence_cb( int control )
 
 void enable_height_plot( int control )
 {
-    //Set default perspective and stuff
+    if (vis->height_plot)
+    {
+        glEnable(GL_DEPTH_TEST);
+
+        eye[0] = 0;
+        eye[1] = 0;
+        eye[2] = 100;
+
+        lookat[0] = vis->gridWidth/2.0f;
+        lookat[1] = vis->gridHeight/2.0f;
+    }
+    else //set default view
+    {
+        glDisable(GL_DEPTH_TEST);
+        eye[0] = 0;
+        eye[1] = 0;
+        eye[2] = -1;
+
+        lookat[0] = 0;
+        lookat[1] = 0;
+    }
 }
 
 //------ INTERACTION CODE STARTS HERE -----------------------------------------------------------------
@@ -98,10 +118,9 @@ void display(void)
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    if (vis->height_plot) {
-        gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
-        vis->draw_3d_grid();
-    }
+
+    vis->draw_3d_grid();
+    gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
 
     vis->visualize();
 
@@ -125,8 +144,11 @@ void reshape(int w, int h)
     vis->wn = (fftw_real)vis->gridWidth  / (fftw_real)(sim->DIM + 1);
     vis->hn = (fftw_real)vis->gridHeight / (fftw_real)(sim->DIM + 1);
 
-    lookat[0] = vis->gridWidth/2.0f;
-    lookat[1] = vis->gridHeight/2.0f;
+    if (vis->height_plot)
+    {
+        lookat[0] = vis->gridWidth/2.0f;
+        lookat[1] = vis->gridHeight/2.0f;
+    }
 
     glutPostRedisplay();
 }
@@ -446,10 +468,6 @@ int main(int argc, char **argv)
 
     vis->create_textures();
 
-
-//    eye[0] = vis->gridWidth/2;
-//    eye[1] = vis->gridHeight/2;
-//    eye[2] = (int) sim->max((float) vis->gridWidth, (float) vis->gridHeight);
     eye[0] = 0;
     eye[1] = 0;
     eye[2] = 100;

@@ -276,36 +276,70 @@ void Visualization::draw_3d_grid()
     glBegin(GL_LINES);
     glColor3f(1,1,1);
 
-    int size = (int) sim->max((float) gridWidth, (float) gridHeight);
-
-    //Draw simple cube outline
-    //Base
-    glVertex3f(0, 0, 0);
-    glVertex3f(size, 0, 0);
-
-    glVertex3f(size, 0, 0);
-    glVertex3f(size, size, 0);
-
-    glVertex3f(size, size, 0);
-    glVertex3f(0, size, 0);
-
-    glVertex3f(0, size, 0);
-    glVertex3f(0, 0, 0);
-
     //Front
-    glVertex3f(0, 0, 0);
-    glVertex3f(0, 0, size);
+    glVertex3f(wn , hn, 0);
+    glVertex3f(wn, hn, hp_height);
 
-    glVertex3f(size, 0, 0);
-    glVertex3f(size, 0, size);
+    glVertex3f(wn + (sim->DIM -1)*wn, hn, 0);
+    glVertex3f(wn + (sim->DIM -1)*wn, hn, hp_height);
 
     //Left
-    glVertex3f(size, size, 0);
-    glVertex3f(size, size, size);
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, 0);
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, hp_height);
 
     //Right
-    glVertex3f(0, size, 0);
-    glVertex3f(0, size, size);
+    glVertex3f(wn + (sim->DIM - 1)*wn, hn + (sim->DIM -1) * hn, 0);
+    glVertex3f(wn + (sim->DIM - 1)*wn, hn + (sim->DIM -1) * hn, hp_height);
+
+    //Top
+    glVertex3f(wn, hn, hp_height);
+    glVertex3f(wn + (sim->DIM -1) * wn, hn, hp_height);
+
+    glVertex3f(wn + (sim->DIM -1) * wn, hn, hp_height);
+    glVertex3f(wn + (sim->DIM -1) * wn, hn + (sim->DIM -1) * hn, hp_height);
+
+    glVertex3f(wn + (sim->DIM -1) * wn, hn + (sim->DIM -1) * hn, hp_height);
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, hp_height);
+
+    glVertex3f(wn, hn + (sim->DIM -1) * hn, hp_height);
+    glVertex3f(wn, hn, hp_height);
+
+    //Draw marks
+    int nsteps = 4;
+    int mark_size = 2;
+
+    for (int i = 1; i < nsteps; ++i) //start at 1 because we don't want to draw at height 0
+    {
+        int height = (hp_height / nsteps)*i;
+        //Front
+        glVertex3d( wn, hn, height);
+        glVertex3d( wn + wn * mark_size, hn, height);
+
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn - wn * mark_size, hn, height);
+
+        //Left
+        glVertex3d( wn, hn, height);
+        glVertex3d( wn, hn + hn * mark_size, height);
+
+        glVertex3d( wn, hn + (sim->DIM - 1)*hn - hn * mark_size, height);
+        glVertex3d( wn, hn + (sim->DIM - 1)*hn, height);
+
+        //Right
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + hn * mark_size, height);
+
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + (sim->DIM - 1)*hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + (sim->DIM - 1)*hn - hn * mark_size, height);
+
+        //Back
+        glVertex3d( wn, hn + (sim->DIM - 1)*hn, height);
+        glVertex3d( wn + wn * mark_size, hn + (sim->DIM - 1)*hn, height);
+
+        glVertex3d( wn + (sim->DIM - 1)*wn, hn + (sim->DIM - 1)*hn, height);
+        glVertex3d( wn + (sim->DIM - 1)*wn - wn * mark_size, hn + (sim->DIM - 1)*hn, height);
+    }
+
     glEnd();
 }
 
@@ -342,22 +376,22 @@ void Visualization::draw_smoke_textures(void)
             px0 = wn + (fftw_real)i * wn;
             py0 = hn + (fftw_real)j * hn;
             idx0 = (j * sim->DIM) + i;
-            if (height_plot) pz0 = dataset[idx0]*20;
+            if (height_plot) pz0 = dataset[idx0]*hp_height;
 
             px1 = wn + (fftw_real)i * wn;
             py1 = hn + (fftw_real)(j + 1) * hn;
             idx1 = ((j + 1) * sim->DIM) + i;
-            if (height_plot) pz1 = dataset[idx1]*20;
+            if (height_plot) pz1 = dataset[idx1]*hp_height;
 
             px2 = wn + (fftw_real)(i + 1) * wn;
             py2 = hn + (fftw_real)(j + 1) * hn;
             idx2 = ((j + 1) * sim->DIM) + (i + 1);
-            if (height_plot) pz2 = dataset[idx2]*20;
+            if (height_plot) pz2 = dataset[idx2]*hp_height;
 
             px3 = wn + (fftw_real)(i + 1) * wn;
             py3 = hn + (fftw_real)j * hn;
             idx3 = (j * sim->DIM) + (i + 1);
-            if (height_plot) pz3 = dataset[idx3]*20;
+            if (height_plot) pz3 = dataset[idx3]*hp_height;
 
             fftw_real v0, v1, v2, v3;
 
@@ -369,7 +403,6 @@ void Visualization::draw_smoke_textures(void)
             glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
             glTexCoord1f(v1);    glVertex3f(px1,py1, pz1);
             glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
-//            glTexCoord1f(v3);    glVertex2f(px3,py3);
 
             glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
             glTexCoord1f(v3);    glVertex3f(px3,py3, pz3);
