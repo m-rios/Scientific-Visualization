@@ -54,7 +54,6 @@ public:
     float clamp_min = 0.0f;
     float clamp_max = 1.0f;
     unsigned int	textureID[3];
-    int texture_mapping = 1;
     int display_divergence = 0;
     int dynamic_scalling = 0;
     int height_plot = 0;
@@ -63,6 +62,7 @@ public:
     int sGlyph = 0;
     int typeGlyph = 0;
     int hp_height = 250;
+    int hp_display_dataset = 0;
 
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);
@@ -78,7 +78,7 @@ public:
     void compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset);
     void prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_real* max_v);
     void draw_grid();
-    void draw_smoke_textures(void);
+    void draw_smoke_textures(fftw_real* dataset, fftw_real min_v, fftw_real max_v);
     void draw_smoke_default();
     void visualize(void);
     void create_textures();
