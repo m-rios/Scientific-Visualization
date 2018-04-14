@@ -7,10 +7,19 @@
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
+//    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+//    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+//    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+}
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+void Visualization::add_seed(GLdouble x, GLdouble y, GLdouble z)
+{
+    seeds.push_back({x, y, z});
+}
+
+void Visualization::remove_seed()
+{
+    seeds.pop_back();
 }
 
 //rainbow: Implements a color palette, mapping the scalar 'value' to a rainbow color RGB
@@ -424,6 +433,27 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
 //    draw_legend(min_v, max_v);
 }
 
+void Visualization::draw_seeds()
+{
+    for (auto seed:seeds)
+    {
+        glTranslated(seed[0], seed[1], seed[2]);
+        GLUquadricObj* pQuadric = gluNewQuadric();
+        gluSphere(pQuadric, 5, 32, 8);
+        glTranslated(-seed[0], -seed[1], -seed[2]); //For some reason glLoadIdentity doesn't work here
+//        glLoadIdentity();
+    }
+
+//    glTranslated(200, 200, 0);
+//    GLUquadricObj* pQuadric = gluNewQuadric();
+//    gluSphere(pQuadric, 5, 32, 8);
+//    glLoadIdentity();
+//    glTranslated(300, 300, 0);
+//    pQuadric = gluNewQuadric();
+//    gluSphere(pQuadric, 5, 32, 8);
+
+}
+
 //visualize: This is the main visualization function
 void Visualization::visualize(void)
 {
@@ -439,6 +469,11 @@ void Visualization::visualize(void)
 
 	if (draw_smoke)
         draw_smoke_surface(dataset, min_v, max_v);
+
+    if (stream_tubes)
+    {
+        draw_seeds();
+    }
 
 	if (draw_vecs)
 	{
