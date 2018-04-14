@@ -11,6 +11,8 @@
 #include <cstring>
 #include <cfloat>
 #include <cassert>
+#include <vector>
+#include <array>
 
 #ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
@@ -63,6 +65,8 @@ public:
     int typeGlyph = 0;
     int hp_height = 250;
     int hp_display_dataset = 0;
+    int stream_tubes = 0;
+    std::vector<std::array<GLdouble, 3>> seeds; //Location of the streamtube seeds
 
     GLfloat light_ambient[4] = { 0.0, 0.0, 0.0, 1.0 };
     GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
@@ -86,5 +90,8 @@ public:
     void create_textures();
     void do_one_simulation_step();
     void draw_3d_grid();
+    void add_seed(GLdouble x, GLdouble y, GLdouble z);
+    void remove_seed();
+    void draw_seeds();
 };
 #endif //SCIENTIFIC_VISUALIZATION_VISUALIZATION_H

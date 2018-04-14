@@ -7,10 +7,19 @@
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
+//    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+//    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+//    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+}
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+void Visualization::add_seed(GLdouble x, GLdouble y, GLdouble z)
+{
+    seeds.push_back({x, y, z});
+}
+
+void Visualization::remove_seed()
+{
+    seeds.pop_back();
 }
 
 //rainbow: Implements a color palette, mapping the scalar 'value' to a rainbow color RGB
@@ -93,7 +102,6 @@ void Visualization::draw_text(const char* text, int x, int y)
     glTranslatef(x, y, 0.0f);
     glScalef(0.15, 0.15, 0.15);
     for( int i = 0; i < len; i++ ) {
-//        glutBitmapCharacter( GLUT_BITMAP_TIMES_ROMAN_24, text[i] );
         glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, (int) text[i]);
     }
     glPopMatrix();
@@ -101,7 +109,11 @@ void Visualization::draw_text(const char* text, int x, int y)
 
 void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
 {
-//    glMatrixMode(GL_PROJECTION);
+    //Draw on the image plane
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0.0, (GLdouble)winWidth, 0.0, (GLdouble)winHeight, -10.0, 10.0);
+
     float step = (float) (winHeight - 2 *hn) / (float) n_colors;
 
     glEnable(GL_TEXTURE_1D);
@@ -177,8 +189,6 @@ void Visualization::find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* 
 //compute_divergence: computes from the x,y vector field the divergence and assigns it to dataset
 void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
 {
-//    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(sim->DIM + 1);
-//    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(sim->DIM + 1);
     for (int j = 0; j < sim->DIM - 1; j++)
     {
         for (int i = 0; i < sim->DIM - 1; i++)
@@ -420,7 +430,28 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     glEnd();
     glDisable(GL_TEXTURE_1D);
 //    glEnable(GL_COLOR_MATERIAL);
-    draw_legend(min_v, max_v);
+//    draw_legend(min_v, max_v);
+}
+
+void Visualization::draw_seeds()
+{
+    for (auto seed:seeds)
+    {
+        glTranslated(seed[0], seed[1], seed[2]);
+        GLUquadricObj* pQuadric = gluNewQuadric();
+        gluSphere(pQuadric, 5, 32, 8);
+        glTranslated(-seed[0], -seed[1], -seed[2]); //For some reason glLoadIdentity doesn't work here
+//        glLoadIdentity();
+    }
+
+//    glTranslated(200, 200, 0);
+//    GLUquadricObj* pQuadric = gluNewQuadric();
+//    gluSphere(pQuadric, 5, 32, 8);
+//    glLoadIdentity();
+//    glTranslated(300, 300, 0);
+//    pQuadric = gluNewQuadric();
+//    gluSphere(pQuadric, 5, 32, 8);
+
 }
 
 //visualize: This is the main visualization function
@@ -438,6 +469,11 @@ void Visualization::visualize(void)
 
 	if (draw_smoke)
         draw_smoke_surface(dataset, min_v, max_v);
+
+    if (stream_tubes)
+    {
+        draw_seeds();
+    }
 
 	if (draw_vecs)
 	{
