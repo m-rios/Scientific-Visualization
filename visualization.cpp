@@ -81,12 +81,11 @@ void Visualization::user_defined_map(float value, float* R, float* G, float* B)
 {
     float h, s;
     float a_hue = min_hue, b_hue = max_hue, a_sat = min_sat, b_sat = max_sat;
-    float value_hue, value_sat = value;
+    float value_hue = value, value_sat = value;
 
     // We always interpolate from min to max values
     if (min_hue > max_hue) //If the colormap extrema is inverted, invert the value
     {
-        printf("Extrema inverted\n");
         value_hue = 1 - value;
         a_hue = max_hue;
         b_hue = min_hue;
@@ -102,26 +101,25 @@ void Visualization::user_defined_map(float value, float* R, float* G, float* B)
     if (min_hue == max_hue) //Constant hue
     {
         h = min_hue;
-        printf("pne\n");
     }
     else //Interpolate
     {
         // Choose direction of smaller angle for interpolation
-//        if (b_hue - a_hue < 0.5) //Counterclockwise
-//        {
-//
-//        }
-//        else //Clockwise
-//        {
-//
-//        }
-       h =  value_hue * (b_hue - a_hue);
+        if (b_hue - a_hue < 0.5) //Counterclockwise
+        {
+            h =  value_hue * (b_hue - a_hue) + a_hue;
+        }
+        else //Clockwise
+        {
+            h =  a_hue - value_hue*(a_hue+1-b_hue)+a_hue;
+            if (h < 0) h = 1+h;
+        }
     }
 
     if (min_sat == max_sat) //Constant saturation
         s = min_sat;
     else //Interpolate
-        s = (value_sat - a_sat)/(b_sat - a_sat);
+        s = value_sat * (b_sat - a_sat) + a_sat;
 
     hsv_to_rgb(h, s, 1, *R, *G, *B); //Get RGB color with constant value = 1;
 }

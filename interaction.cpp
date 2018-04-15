@@ -460,8 +460,8 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( colormap_radio, "Custom" );
     (max_hue_spinner = glui->add_spinner_to_panel(colormap_panel, "Max hue", GLUI_SPINNER_INT, NULL, 1, update_custom_hue))->set_int_limits(0,359);
     (min_hue_spinner = glui->add_spinner_to_panel(colormap_panel, "Min hue", GLUI_SPINNER_INT, NULL, 0, update_custom_hue))->set_int_limits(0, 359);
-    (max_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Max sat", GLUI_SPINNER_FLOAT, &vis->max_sat))->set_float_limits(0,1);
-    (min_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Min sat", GLUI_SPINNER_FLOAT, &vis->min_sat))->set_float_limits(0,1);
+    (max_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Max sat", GLUI_SPINNER_FLOAT, &vis->max_sat, 3, update_custom_hue))->set_float_limits(0,1);
+    (min_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Min sat", GLUI_SPINNER_FLOAT, &vis->min_sat, 3, update_custom_hue))->set_float_limits(0,1);
 
     min_hue_spinner->disable(); min_sat_spinner->disable(); max_hue_spinner->disable(); max_sat_spinner->disable();
 
