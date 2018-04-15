@@ -95,9 +95,9 @@ void divergence_cb( int control )
     }
 }
 
-void enable_height_plot( int control )
+void enable_3d_view( int control )
 {
-    if (vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
     {
         glEnable(GL_DEPTH_TEST);
 
@@ -119,14 +119,14 @@ void display(void)
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    if (vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
         glFrustum(-.5, .5, -.5, .5, 1, 10000);
     else
         glOrtho(0.0, (GLdouble)vis->winWidth, 0.0, (GLdouble)vis->winHeight, -10.0, 10.0);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    if (vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
     {
         vis->draw_3d_grid();
         gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
@@ -210,6 +210,22 @@ void mouseCallback(int button, int state, int x, int y)
         right_button = state;
     else if (button == GLUT_MIDDLE_BUTTON)
         middle_button = state;
+
+    if (vis->stream_tubes && left_button == GLUT_DOWN) //place seed
+    {
+        GLdouble z;
+        glReadPixels (x, y, 1, 1, GL_DEPTH_COMPONENT, GL_DOUBLE, &z);
+        GLdouble m[16];
+        glGetDoublev(GL_MODELVIEW_MATRIX, m);
+        GLdouble p[16];
+        glGetDoublev(GL_PROJECTION_MATRIX, p);
+        GLint viewport[4];
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        GLdouble X, Y, Z;
+        gluUnProject(x, y, z, m, p, viewport, &X, &Y, &Z);
+//        vis->add_seed(X, Y, Z);
+        vis->add_seed(x, y, 0);
+    }
 
     last_mx = x;
     last_my = y;
@@ -344,16 +360,12 @@ void zoom(int my)
 // drag: select which action to map mouse drag to, depending on pressed button
 void drag(int mx, int my)
 {
-    if (!vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
     {
-       add_matter(mx, my);
-    }
-    else
-    {
-       if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
-       glutSetWindow(glui->get_glut_window_id());
+        if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
+        glutSetWindow(glui->get_glut_window_id());
 
-       if (middle_button == GLUT_DOWN)
+        if (middle_button == GLUT_DOWN)
            zoom(my);
        else
        {
@@ -362,7 +374,10 @@ void drag(int mx, int my)
            else if (right_button == GLUT_DOWN)
                orbit_view(mx, my);
        }
-
+    }
+    else
+    {
+        add_matter(mx, my);
     }
 }
 
@@ -484,13 +499,17 @@ int main(int argc, char **argv)
     glui->add_checkbox("Render glyphs", &vis->draw_vecs);
 
     GLUI_Panel *height_plot_panel = new GLUI_Panel(glui, "Height plot options");
-    glui->add_checkbox_to_panel(height_plot_panel, "Height plot", &vis->height_plot, -1, enable_height_plot);
+    glui->add_checkbox_to_panel(height_plot_panel, "Height plot", &vis->height_plot, -1, enable_3d_view);
     hp_dataset_radio = new GLUI_RadioGroup(height_plot_panel, (&vis->hp_display_dataset), RADIO_HP_DATASET, radio_cb);
     new GLUI_RadioButton( hp_dataset_radio, "Density" );
     new GLUI_RadioButton( hp_dataset_radio, "Velocity" );
     new GLUI_RadioButton( hp_dataset_radio, "Force" );
     height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height);
     height_spinner->set_int_limits(50, 300);
+
+    GLUI_Panel *stream_tubes_panel = new GLUI_Panel(glui, "Stream tubes options");
+    glui->add_checkbox_to_panel(stream_tubes_panel, "Enable stream tubes", &vis->stream_tubes, -1, enable_3d_view); //At some point this, height plots and basic have to be changed to radius group
+
 
 
     GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &vis->n_colors, -1, color_bands_cb);
