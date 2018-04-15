@@ -37,6 +37,7 @@ public:
     const int COLOR_BLACKWHITE=0;   //different types of color mapping: black-and-white, rainbow, banded
     const int COLOR_RAINBOW=1;
     const int COLOR_HEATMAP=2;
+    const int COLOR_CUSTOM=3;
     int   scalar_col = 1;           //method for scalar coloring
     int   frozen = 0;               //toggles on/off the animation
 
@@ -67,6 +68,7 @@ public:
     int hp_display_dataset = 0;
     int stream_tubes = 0;
     std::vector<std::array<GLdouble, 3>> seeds; //Location of the streamtube seeds
+    float min_hue=0, max_hue=0.5, min_sat=1, max_sat=1; //parameters for the user-defined colormap
 
     GLfloat light_ambient[4] = { 0.0, 0.0, 0.0, 1.0 };
     GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
@@ -75,6 +77,7 @@ public:
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);
     void heatmap(float value, float* R, float* G, float* B);
+    void user_defined_map(float value, float* R, float* G, float* B);
     float conform_to_bands(float vy);
     fftw_real scale(fftw_real min, fftw_real max, fftw_real value);
     void set_colormap(float vy);

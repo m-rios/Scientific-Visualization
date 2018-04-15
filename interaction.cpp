@@ -19,6 +19,10 @@ int segments = 0;
 GLUI_Spinner *clamp_max_spinner;
 GLUI_Spinner *clamp_min_spinner;
 GLUI_Spinner *height_spinner;
+GLUI_Spinner *min_hue_spinner;
+GLUI_Spinner *max_hue_spinner;
+GLUI_Spinner *min_sat_spinner;
+GLUI_Spinner *max_sat_spinner;
 GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
@@ -42,7 +46,13 @@ void radio_cb( int control )
 {
     switch (control)
     {
-        case RADIO_COLOR_MAP:   vis->scalar_col = colormap_radio->get_int_val();         break;
+        case RADIO_COLOR_MAP:
+            vis->scalar_col = colormap_radio->get_int_val();
+            if (vis->scalar_col != 3)
+            {min_sat_spinner->disable(); min_hue_spinner->disable(); max_hue_spinner->disable(); max_sat_spinner->disable();}
+            else
+            {min_sat_spinner->enable(); min_hue_spinner->enable(); max_hue_spinner->enable(); max_sat_spinner->enable();}
+            break;
         case RADIO_DATASET:     vis->display_dataset = dataset_radio->get_int_val();     break;
         case RADIO_GLYPH:       vis->vGlyph = (glyph_radio->get_int_val());              break;
         case RADIO_HP_DATASET:     vis->hp_display_dataset = hp_dataset_radio->get_int_val();     break;
@@ -76,6 +86,7 @@ void divergence_cb( int control )
     {
         clamp_min_spinner->set_int_limits(-1, 0);
         clamp_min_spinner->set_int_val(-1);
+
     }
     else
     {
@@ -393,6 +404,15 @@ void reset_simulation()
     sim->reset_simulation();
 }
 
+void update_custom_hue(int control)
+{
+    if (control == 0)
+        vis->min_hue = min_hue_spinner->get_float_val()/359.0f;
+    else
+        vis->max_hue = max_hue_spinner->get_float_val()/359.0f;
+    vis->create_textures();
+}
+
 //main: The main program
 int main(int argc, char **argv)
 {
@@ -429,7 +449,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
+    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
 
 
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
@@ -437,6 +457,15 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( colormap_radio, "Greyscale" );
     new GLUI_RadioButton( colormap_radio, "Rainbow" );
     new GLUI_RadioButton( colormap_radio, "Heatmap" );
+    new GLUI_RadioButton( colormap_radio, "Custom" );
+    (max_hue_spinner = glui->add_spinner_to_panel(colormap_panel, "Max hue", GLUI_SPINNER_INT, NULL, 1, update_custom_hue))->set_int_limits(0,359);
+    (min_hue_spinner = glui->add_spinner_to_panel(colormap_panel, "Min hue", GLUI_SPINNER_INT, NULL, 0, update_custom_hue))->set_int_limits(0, 359);
+    (max_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Max sat", GLUI_SPINNER_FLOAT, &vis->max_sat))->set_float_limits(0,1);
+    (min_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Min sat", GLUI_SPINNER_FLOAT, &vis->min_sat))->set_float_limits(0,1);
+
+    min_hue_spinner->disable(); min_sat_spinner->disable(); max_hue_spinner->disable(); max_sat_spinner->disable();
+
+
 
     GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
     dataset_radio = new GLUI_RadioGroup(dataset_panel, (&vis->display_dataset), RADIO_DATASET, radio_cb);

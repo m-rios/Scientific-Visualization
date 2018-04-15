@@ -4,6 +4,26 @@
 
 #include "visualization.h"
 
+void hsv_to_rgb(float h, float s, float v, float &r, float &g, float &b)
+{
+    int hue = (int) (h*6);
+    float frac = 6*h-hue;
+    float lx = v*(1-s);
+    float ly = v*(1-s*frac);
+    float lz = v*(1-s*(1-frac));
+
+    switch(hue)
+    {
+        case 0:
+        case 6: r = v; g=lz; b=lx; break;
+        case 1: r=ly; g=v; b=lx; break;
+        case 2: r=lx; g=v; b=lz; break;
+        case 3: r=lx; g=ly; b=v; break;
+        case 4: r=lz; g=lx; b=v; break;
+        case 5: r=v; g=lx; b=ly; break;
+    }
+}
+
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
@@ -45,12 +65,65 @@ void Visualization::heatmap(float value, float* R, float* G, float* B)
     if (value>1)
         value=1;
 
-    //For now we don't mess with S,V, only with Hue
-    //Normalise value to [0,3] 0->Black, 1->Full red, 2-> Orange, 3->Full yellow.
-    value *= 4;
-    *R = sim->max(0, 1 - fabs(value/2-1)) + sim->max(0, 1 - fabs(value/2-2));
-    *B = sim->max(0, 1 - fabs(value - 4));
-    *G = sim->max(0, 1 - fabs(value-3)) + sim->max(0, 1 - fabs(value-4));
+    // Segments: Black-Red (value), Red-Yellow (hue), Yellow-White (saturation);
+    float r_val = 0.50; //Value at which the map is red
+    float y_val = 0.80; //Value at which the map is yellow
+
+    float h = value < r_val ? 0 : (value < y_val ? 0.166 * (value-r_val)/(y_val - r_val) : 0.166);
+    float s = value < y_val ? 1 : 1-(value - y_val)/(1 - y_val); //fully saturated colors
+    float v = value < r_val ? value/r_val : 1;
+
+    hsv_to_rgb(h, s, v, *R, *G, *B);
+
+}
+
+void Visualization::user_defined_map(float value, float* R, float* G, float* B)
+{
+    float h, s;
+    float a_hue = min_hue, b_hue = max_hue, a_sat = min_sat, b_sat = max_sat;
+    float value_hue, value_sat = value;
+
+    // We always interpolate from min to max values
+    if (min_hue > max_hue) //If the colormap extrema is inverted, invert the value
+    {
+        printf("Extrema inverted\n");
+        value_hue = 1 - value;
+        a_hue = max_hue;
+        b_hue = min_hue;
+    }
+
+    if (min_sat > max_sat)
+    {
+        value_sat = 1 - value;
+        a_sat = max_sat;
+        b_sat = min_sat;
+    }
+
+    if (min_hue == max_hue) //Constant hue
+    {
+        h = min_hue;
+        printf("pne\n");
+    }
+    else //Interpolate
+    {
+        // Choose direction of smaller angle for interpolation
+//        if (b_hue - a_hue < 0.5) //Counterclockwise
+//        {
+//
+//        }
+//        else //Clockwise
+//        {
+//
+//        }
+       h =  value_hue * (b_hue - a_hue);
+    }
+
+    if (min_sat == max_sat) //Constant saturation
+        s = min_sat;
+    else //Interpolate
+        s = (value_sat - a_sat)/(b_sat - a_sat);
+
+    hsv_to_rgb(h, s, 1, *R, *G, *B); //Get RGB color with constant value = 1;
 }
 
 float Visualization::conform_to_bands(float vy)
@@ -70,14 +143,7 @@ fftw_real Visualization::scale(fftw_real min, fftw_real max, fftw_real value)
 void Visualization::set_colormap(float vy)
 {
 	float R,G,B;
-    vy = conform_to_bands(vy);
-	if (scalar_col==COLOR_BLACKWHITE)
-        R = G = B = vy;
-	else if (scalar_col==COLOR_RAINBOW)
-		rainbow(vy,&R,&G,&B);
-    else if (scalar_col==COLOR_HEATMAP)
-        heatmap(vy, &R, &G, &B);
-
+    get_colormap(vy, &R, &G, &B);
 	glColor3f(R,G,B);
 }
 
@@ -90,6 +156,8 @@ void Visualization::get_colormap(float vy, float *R, float *G, float *B)
         rainbow(vy,R,G,B);
     else if (scalar_col==COLOR_HEATMAP)
         heatmap(vy, R, G, B);
+    else if (scalar_col==COLOR_CUSTOM)
+        user_defined_map(vy, R, G, B);
 }
 
 //draw text at x, y location
@@ -193,8 +261,8 @@ void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *da
     {
         for (int i = 0; i < sim->DIM - 1; i++)
 		{
-            int next_x = (j * sim->DIM) + (i + 1); //next in x
-            int next_y = ((j + 1) * sim->DIM) + i; //next cell in y
+            int next_y = (j * sim->DIM) + (i + 1); //next in x
+            int next_x = ((j + 1) * sim->DIM) + i; //next cell in y
 
             int current = (j * sim->DIM) + i;
 			dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*1000;	//Divergence operator
@@ -530,7 +598,7 @@ void Visualization::visualize(void)
                         glRotatef(90,  0.0, 1.0, 0.0);
                         glRotatef(-deg, 1.0, 0.0, 0.0);
                         //glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
-                        glutSolidCone(10.0, magV * 200, 20, 20);
+                        glutSolidCone(10.0, magV * 150, 20, 20);
                         glLoadIdentity();
                     } else if (vGlyph == 1) // force
                     {
@@ -558,7 +626,7 @@ void Visualization::create_textures()					//Create one 1D texture for each of th
 
     int selected_map = scalar_col;
 
-    for(int i=COLOR_BLACKWHITE;i<=COLOR_HEATMAP;++i)
+    for(int i=COLOR_BLACKWHITE;i<=COLOR_CUSTOM;++i)
     {													//Generate all three textures:
         glBindTexture(GL_TEXTURE_1D,textureID[i]);		//Make i-th texture active (for setting it)
         const int size = 512;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
