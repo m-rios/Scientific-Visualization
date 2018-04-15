@@ -111,7 +111,7 @@ void Visualization::user_defined_map(float value, float* R, float* G, float* B)
         }
         else //Clockwise
         {
-            h =  a_hue - value_hue*(a_hue+1-b_hue)+a_hue;
+            h =  a_hue - value_hue*(a_hue+1-b_hue);
             if (h < 0) h = 1+h;
         }
     }
