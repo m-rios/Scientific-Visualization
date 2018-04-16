@@ -6,6 +6,7 @@
 #include "GL/glui.h"
 #include "simulation.h"
 #include "visualization.h"
+#include "util.h"
 
 GLUI_RadioGroup *colormap_radio;
 GLUI_RadioGroup *glyphtype;
@@ -23,6 +24,9 @@ GLUI_Spinner *min_hue_spinner;
 GLUI_Spinner *max_hue_spinner;
 GLUI_Spinner *min_sat_spinner;
 GLUI_Spinner *max_sat_spinner;
+GLUI_Spinner *seed_x_spinner;
+GLUI_Spinner *seed_y_spinner;
+GLUI_Spinner *seed_z_spinner;
 GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
@@ -169,6 +173,9 @@ void reshape(int w, int h)
     }
 
     glutPostRedisplay();
+
+    seed_x_spinner->set_int_limits(0, vis->gridWidth);
+    seed_y_spinner->set_int_limits(0, vis->gridHeight);
 }
 
 //keyboard: Handle key presses
@@ -219,23 +226,23 @@ void mouseCallback(int button, int state, int x, int y)
     else if (button == GLUT_MIDDLE_BUTTON)
         middle_button = state;
 
-    if (vis->stream_tubes && left_button == GLUT_DOWN) //place seed
-    {
-        GLdouble clipX = (x/vis->gridWidth)*2.0-1.0;
-        GLdouble clipY = (y/vis->gridHeight)*2.0; // the Y is usually upside down
-        GLdouble z;
-        glReadPixels (clipX, clipY, 1, 1, GL_DEPTH_COMPONENT, GL_DOUBLE, &z);
-        GLdouble m[16];
-        glGetDoublev(GL_MODELVIEW_MATRIX, m);
-        GLdouble p[16];
-        glGetDoublev(GL_PROJECTION_MATRIX, p);
-        GLint viewport[4];
-        glGetIntegerv(GL_VIEWPORT, viewport);
-        GLdouble X, Y, Z;
-        gluUnProject(clipX, clipY, 0, m, p, viewport, &X, &Y, &Z);
-//        vis->add_seed(X, Y, Z);
-        vis->add_seed(x, y, 0);
-    }
+//    if (vis->stream_tubes && left_button == GLUT_DOWN) //place seed
+//    {
+//        GLdouble clipX = (x/vis->gridWidth)*2.0-1.0;
+//        GLdouble clipY = (y/vis->gridHeight)*2.0; // the Y is usually upside down
+//        GLdouble z;
+//        glReadPixels (clipX, clipY, 1, 1, GL_DEPTH_COMPONENT, GL_DOUBLE, &z);
+//        GLdouble m[16];
+//        glGetDoublev(GL_MODELVIEW_MATRIX, m);
+//        GLdouble p[16];
+//        glGetDoublev(GL_PROJECTION_MATRIX, p);
+//        GLint viewport[4];
+//        glGetIntegerv(GL_VIEWPORT, viewport);
+//        GLdouble X, Y, Z;
+//        gluUnProject(clipX, clipY, 0, m, p, viewport, &X, &Y, &Z);
+////        vis->add_seed(X, Y, Z);
+//        vis->add_seed(x, y, 0);
+//    }
 
     last_mx = x;
     last_my = y;
@@ -280,28 +287,6 @@ void add_matter(int mx, int my)
     sim->rho[Y * sim->DIM + X] = 10.0f;
     lmx = mx;
     lmy = my;
-}
-
-void crossproduct(float a[3], float b[3], float res[3])
-{
-    res[0] = (a[1] * b[2] - a[2] * b[1]);
-    res[1] = (a[2] * b[0] - a[0] * b[2]);
-    res[2] = (a[0] * b[1] - a[1] * b[0]);
-}
-
-void normalize(float v[3])
-{
-    float l = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
-    l = 1 / (float)sqrt(l);
-
-    v[0] *= l;
-    v[1] *= l;
-    v[2] *= l;
-}
-
-float length(float v[3])
-{
-    return (float)sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
 }
 
 int orbit_view(int mx, int my)
@@ -440,6 +425,12 @@ void seed_position_cb(int control)
     vis->move_seed((GLdouble) seed_x, (GLdouble) seed_y, (GLdouble) seed_z);
 }
 
+void heigh_cb(int control)
+{
+    seed_z_spinner->set_int_limits(0, vis->hp_height);
+    vis->dn = vis->hp_height / vis->volume_instances;
+}
+
 //main: The main program
 int main(int argc, char **argv)
 {
@@ -531,16 +522,16 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( hp_dataset_radio, "Density" );
     new GLUI_RadioButton( hp_dataset_radio, "Velocity" );
     new GLUI_RadioButton( hp_dataset_radio, "Force" );
-    height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height);
+    height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height, 0, heigh_cb);
     height_spinner->set_int_limits(50, 300);
 
     GLUI_Panel *stream_tubes_panel = new GLUI_Panel(glui, "Stream tubes options");
     glui->add_checkbox_to_panel(stream_tubes_panel, "Enable stream tubes", &vis->stream_tubes, -1, enable_3d_view); //At some point this, height plots and basic have to be changed to radius group
     glui->add_button_to_panel(stream_tubes_panel, "Add seed", 0, seed_spawn_cb);
     glui->add_button_to_panel(stream_tubes_panel, "Remove seed", 1, seed_spawn_cb);
-    glui->add_spinner_to_panel(stream_tubes_panel, "x", GLUI_SPINNER_INT, &seed_x, 0, seed_position_cb)->set_int_limits(0, 10000);
-    glui->add_spinner_to_panel(stream_tubes_panel, "y", GLUI_SPINNER_INT, &seed_y, 0, seed_position_cb)->set_int_limits(0, 10000);
-    glui->add_spinner_to_panel(stream_tubes_panel, "z", GLUI_SPINNER_INT, &seed_z, 0, seed_position_cb)->set_int_limits(0, 10000);
+    (seed_x_spinner = glui->add_spinner_to_panel(stream_tubes_panel, "x", GLUI_SPINNER_INT, &seed_x, 0, seed_position_cb))->set_int_limits(0, 10000);
+    (seed_y_spinner = glui->add_spinner_to_panel(stream_tubes_panel, "y", GLUI_SPINNER_INT, &seed_y, 0, seed_position_cb))->set_int_limits(0, 10000);
+    (seed_z_spinner = glui->add_spinner_to_panel(stream_tubes_panel, "z", GLUI_SPINNER_INT, &seed_z, 0, seed_position_cb))->set_int_limits(0, 10000);
 
     GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &vis->n_colors, -1, color_bands_cb);
     color_bands_spinner->set_int_limits(3, 256);

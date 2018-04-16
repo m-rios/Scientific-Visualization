@@ -27,16 +27,22 @@ void hsv_to_rgb(float h, float s, float v, float &r, float &g, float &b)
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
+    dn = hp_height/volume_instances;
 }
 
 void Visualization::add_seed(GLdouble x, GLdouble y, GLdouble z)
 {
+    //Clamp coordinates to grid domain
+    x = x < wn ? wn : x > gridWidth ? gridWidth : x;
+    y = y < hn ? hn : y > gridHeight ? gridHeight : y;
+
     seeds.push_back({x, y, z});
 }
 
 void Visualization::remove_seed()
 {
-    seeds.pop_back();
+    if (seeds.size() > 0)
+        seeds.pop_back();
 }
 
 //rainbow: Implements a color palette, mapping the scalar 'value' to a rainbow color RGB
@@ -413,6 +419,92 @@ void Visualization::draw_3d_grid()
     glEnd();
 }
 
+//Set the normal for the vertex at grid coordiantes i, j
+void Visualization::set_normal(int i, int j, float value, fftw_real *dataset)
+{
+    std::vector<std::array<float, 3>> normals; //Adjacent patch normals
+    float hnf = (float) hn;
+    float wnf = (float) wn;
+    float z = 0;
+
+    if (i > 0 && j < sim->DIM-1) //Upper left patch
+    {
+        //Up vector
+        z = (float) dataset[(j+1)*sim->DIM + i];
+        float up[3] = {0, hnf, z - value};
+        //Left vector
+        z = (float) dataset[j*sim->DIM + (i-1)];
+        float left[3] = {-wnf, 0, z-value};
+        float n[3];
+        crossproduct(up, left, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    if (i < sim->DIM-1 && j < sim->DIM-1) //Upper right patches
+    {
+        //Up vector
+        z = (float) dataset[(j+1)*sim->DIM + i];
+        float up[3] = {0, hnf, z - value};
+        //Up-right vector
+        z = (float) dataset[(j+1)*sim->DIM + (i+1)];
+        float upright[3] = {wnf, hnf, z - value};
+        //Right vector
+        z = (float) dataset[j*sim->DIM + (i+1)];
+        float right[3] = {wnf, 0, z-value};
+        float n[3];
+        crossproduct(upright, up, n);
+        normals.push_back({n[0], n[1], n[2]});
+        crossproduct(right, upright, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    if (i < sim->DIM-1 && j > 0) //Lower right patch
+    {
+        //Down vector
+        z = (float) dataset[(j-1)*sim->DIM + i];
+        float down[3] = {0, -hnf, z - value};
+        //Right vector
+        z = (float) dataset[j*sim->DIM + (i+1)];
+        float right[3] = {wnf, 0, z-value};
+        float n[3];
+        crossproduct(down, right, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    if (i > 0 && j > 0) //Lower left patches
+    {
+        //Down vector
+        z = (float) dataset[(j-1)*sim->DIM + i];
+        float down[3] = {0, -hnf, z - value};
+        //Left vector
+        z = (float) dataset[j*sim->DIM + (i-1)];
+        float left[3] = {-wnf, 0, z-value};
+        //Downleft vector
+        z = (float) dataset[(j-1)*sim->DIM + (i-1)];
+        float downleft[3] = {-wnf, -hnf, z-value};
+        float n[3];
+        crossproduct(left, downleft, n);
+        normals.push_back({n[0], n[1], n[2]});
+        crossproduct(downleft, down, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    //Average normals
+    float final_normal[3] = {0.0f, 0.0f, 0.0f};
+
+    for (auto n:normals)
+    {
+        final_normal[0] += n[0];
+        final_normal[1] += n[1];
+        final_normal[2] += n[2];
+    }
+
+    normalize(final_normal);
+
+    glNormal3fv(final_normal);
+
+}
+
 void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v)
 {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -442,28 +534,6 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
 
         display_dataset = old_display_dataset;
         apply_mode = old_apply_mode;
-
-        glBegin(GL_TRIANGLES);
-
-        glTexCoord1f(0.0f);
-        glNormal3f(0, 0.25f, 1);
-        glVertex3f(0, 0, 0);
-        glVertex3f(400, 0, 0);
-        glVertex3f(400, 400, 100);
-
-        glVertex3f(0, 0, 0);
-        glVertex3f(0, 400, 100);
-        glVertex3f(400, 400, 100);
-
-        glVertex3f(0, 400, 100);
-        glVertex3f(400, 400, 100);
-        glVertex3f(400, 800, 0);
-
-        glVertex3f(0, 400, 100);
-        glVertex3f(0, 800, 0);
-        glVertex3f(400, 800, 0);
-
-        glEnd();
     }
 
     int idx, idx0, idx1, idx2, idx3;
@@ -536,11 +606,70 @@ void Visualization::move_seed(GLdouble x, GLdouble y, GLdouble z)
         seeds.back() = {x, y, z};
 }
 
+void Visualization::interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fftw_real &vx, fftw_real &vy)
+{
+    int i, j, k;
+
+    i = (int) (x / wn);
+    j = (int) (y / hn);
+    k = (int) (z / dn);
+
+    //Transform coordinates to unit grid
+    double r = (x - i*wn)/wn;
+    double s = (y - j*hn)/hn;
+    double t = (z - k*dn)/dn;
+
+    //Compute basis functions
+    double b1 = (1-r)*(1-s)*(1-t);
+    double b2 = r*(1-s)*(1-t);
+    double b3 = r*s*(1-t);
+    double b4 = (1-r)*s*(1-t);
+    double b5 = (1-r)*(1-s)*t;
+    double b6 = r*(1-s)*t;
+    double b7= r*s*t;
+    double b8 = (1-r)*s*t;
+
+    //Get values of the hexahedron vertices
+    double x1 = v_volume[k][0][j*sim->DIM+i];       double y1 = v_volume[k][1][j*sim->DIM+i];
+    double x2 = v_volume[k][0][j*sim->DIM+i+1];     double y2 = v_volume[k][1][j*sim->DIM+i+1];
+    double x3 = v_volume[k][0][(j+1)*sim->DIM+i+1]; double y3 = v_volume[k][1][(j+1)*sim->DIM+i+1];
+    double x4 = v_volume[k][0][(j+1)*sim->DIM+i];   double y4 = v_volume[k][1][(j+1)*sim->DIM+i];
+
+    double x5 = v_volume[k+1][0][j*sim->DIM+i];       double y5 = v_volume[k+1][1][j*sim->DIM+i];
+    double x6 = v_volume[k+1][0][j*sim->DIM+i+1];     double y6 = v_volume[k+1][1][j*sim->DIM+i+1];
+    double x7 = v_volume[k+1][0][(j+1)*sim->DIM+i+1]; double y7 = v_volume[k+1][1][(j+1)*sim->DIM+i+1];
+    double x8 = v_volume[k+1][0][(j+1)*sim->DIM+i];   double y8 = v_volume[k+1][1][(j+1)*sim->DIM+i];
+
+    //Interpolate
+    vx = b1*x1 + b2*x2 + b3*x3 + b4*x4 + b5*x5 + b6*x6 + b7*x7 + b8*x8;
+    vy = b1*y1 + b2*y2 + b3*y3 + b4*y4 + b5*y5 + b6*y6 + b7*y7 + b8*y8;
+}
+
 void Visualization::draw_tubes()
 {
-    for (auto seed:seeds)
-    {
+    std::vector<std::vector<std::array<GLdouble, 3>>> streamlines;
 
+    for (auto seed:seeds) //for all the seed points
+    {
+        std::vector<std::array<GLdouble, 3>> streamline;
+
+        GLdouble x=seed[0], y=seed[1], z=seed[2], t=0;
+        fftw_real vx, vy;
+
+        while (z < hp_height || t < max_t)
+        {
+            streamline.push_back({x, y, z});
+
+            interpolate_3d_point(x, y, z, vx, vy);
+
+            x = x + vx*dt;
+            y = y + vy*dt;
+            z = z + dt; //Must decide proper step for z
+
+            t += dt;
+        }
+
+        streamlines.push_back(streamline);
     }
 }
 
@@ -713,8 +842,22 @@ void Visualization::create_textures()					//Create one 1D texture for each of th
 void Visualization::do_one_simulation_step(void)
 {
     sim->do_one_simulation_step();
-    v_volume.push({sim->vx, sim->vy});
-    if (v_volume.size() > 50)
-        v_volume.pop();
+
+    size_t dim = sim->DIM * 2*(sim->DIM/2+1);
+
+    fftw_real *x = (fftw_real*) malloc(dim);
+    fftw_real *y = (fftw_real*) malloc(dim);
+
+    memcpy(x, sim->vx, dim);
+    memcpy(y, sim->vy, dim);
+
+    v_volume.push_front({x, y});
+    if (v_volume.size() > volume_instances)
+    {
+        std::array<fftw_real*,2> xy = v_volume.back();
+        v_volume.pop_back();
+        free(xy[0]);
+        free(xy[1]);
+    }
     glutPostRedisplay();
 }

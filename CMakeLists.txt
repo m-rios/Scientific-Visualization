@@ -54,7 +54,7 @@ add_executable(tests ${TESTS_SOURCES})
 target_link_libraries(tests ${LIBS})
 
 ## new architecture ####################################################################################################
-set(SOURCES_NEW simulation.cpp visualization.cpp interaction.cpp visualization.h simulation.h)
+set(SOURCES_NEW simulation.cpp visualization.cpp interaction.cpp visualization.h simulation.h util.h util.cpp)
 add_executable(new_arch ${SOURCES_NEW})
 target_link_libraries(new_arch ${LIBS})
 
