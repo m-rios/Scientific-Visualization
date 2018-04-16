@@ -70,10 +70,6 @@ public:
     std::vector<std::array<GLdouble, 3>> seeds; //Location of the streamtube seeds
     float min_hue=0, max_hue=0, min_sat=1, max_sat=1; //parameters for the user-defined colormap
 
-    GLfloat light_ambient[4] = { 0.0, 0.0, 0.0, 1.0 };
-    GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
-    GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
-
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);
     void heatmap(float value, float* R, float* G, float* B);

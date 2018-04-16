@@ -27,9 +27,6 @@ void hsv_to_rgb(float h, float s, float v, float &r, float &g, float &b)
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
-//    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-//    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-//    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 }
 
 void Visualization::add_seed(GLdouble x, GLdouble y, GLdouble z)
@@ -255,12 +252,12 @@ void Visualization::find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* 
 //compute_divergence: computes from the x,y vector field the divergence and assigns it to dataset
 void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
 {
-    for (int j = 0; j < sim->DIM - 1; j++)
+    for (int i = 0; i < sim->DIM - 1; i++)
     {
-        for (int i = 0; i < sim->DIM - 1; i++)
+        for (int j = 0; j < sim->DIM - 1; j++)
 		{
-            int next_y = (j * sim->DIM) + (i + 1); //next in x
-            int next_x = ((j + 1) * sim->DIM) + i; //next cell in y
+            int next_x = (j * sim->DIM) + (i + 1); //next in x
+            int next_y = ((j + 1) * sim->DIM) + i; //next cell in y
 
             int current = (j * sim->DIM) + i;
 			dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*1000;	//Divergence operator
@@ -308,10 +305,13 @@ void Visualization::prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_r
     //Apply transformation
     if (apply_mode == APPLY_SCALING)    //Apply scaling
     {
-		if (!dynamic_scalling) return;
         find_min_max(min_v, max_v, dataset);
-        for (int i = 0; i < dim; ++i)
-            dataset[i] = scale(*min_v, *max_v, dataset[i]);
+        if (*max_v < (fftw_real) 0.0009)
+            for (int i = 0; i < dim; ++i)
+                dataset[i] = 0;
+        else
+            for (int i = 0; i < dim; ++i)
+                dataset[i] = scale(*min_v, *max_v, dataset[i]);
     }
     else if (apply_mode == APPLY_CLAMP) //Apply clamping
     {
@@ -416,9 +416,6 @@ void Visualization::draw_3d_grid()
 void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v)
 {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-//    glDisable(GL_LIGHTING);
-//    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
     glShadeModel(GL_SMOOTH);
 
     glEnable(GL_TEXTURE_1D);
@@ -427,7 +424,7 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
+    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
 
     //Prepare dataset for height plot if enabled
     size_t dim = sim->DIM * 2*(sim->DIM/2+1);
@@ -450,7 +447,7 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     int idx, idx0, idx1, idx2, idx3;
     double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     glBegin(GL_TRIANGLES);
-//    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
+    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
     for (int j = 0; j < sim->DIM - 1; j++)
     {
         for (int i = 0; i < sim->DIM - 1; i++)
@@ -495,7 +492,7 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     }
     glEnd();
     glDisable(GL_TEXTURE_1D);
-//    glEnable(GL_COLOR_MATERIAL);
+    glEnable(GL_COLOR_MATERIAL);
 //    draw_legend(min_v, max_v);
 }
 
@@ -530,15 +527,26 @@ void Visualization::visualize(void)
     fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
+    glDisable(GL_LIGHTING);
+
     if (height_plot)
+    {
         draw_3d_grid();
+        glEnable(GL_LIGHTING);
+    }
 
 	if (draw_smoke)
         draw_smoke_surface(dataset, min_v, max_v);
 
     if (stream_tubes)
     {
+        glEnable(GL_LIGHTING);
         draw_seeds();
+
+        glTranslated(gridWidth/2.0f-100, gridHeight/2.0f-100, 50);
+        GLUquadricObj* pQuadric = gluNewQuadric();
+        gluSphere(pQuadric, 50, 32, 8);
+        glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
     }
 
 	if (draw_vecs)
@@ -612,7 +620,7 @@ void Visualization::visualize(void)
 
         }
 	}
-    glLoadIdentity();
+//    glLoadIdentity();
     draw_legend(min_v, max_v);
 }
 

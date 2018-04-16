@@ -40,6 +40,12 @@ int last_mx = 0;
 float eye[3]; //point representing the eye
 float lookat[3]; //point towards which eye has too point
 
+GLfloat light_ambient[4] = { 0.3, 0.3, 0.3, 1.0 };
+GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
+GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
+GLfloat light_position[4] = { ((GLfloat)vis->gridWidth)/2.0f, ((GLfloat)vis->gridHeight)/2.0f, 800.0, 1.0 };
+
+
 using namespace std;
 
 void radio_cb( int control )
@@ -213,8 +219,10 @@ void mouseCallback(int button, int state, int x, int y)
 
     if (vis->stream_tubes && left_button == GLUT_DOWN) //place seed
     {
+        GLdouble clipX = (x/vis->gridWidth)*2.0-1.0;
+        GLdouble clipY = (y/vis->gridHeight)*2.0; // the Y is usually upside down
         GLdouble z;
-        glReadPixels (x, y, 1, 1, GL_DEPTH_COMPONENT, GL_DOUBLE, &z);
+        glReadPixels (clipX, clipY, 1, 1, GL_DEPTH_COMPONENT, GL_DOUBLE, &z);
         GLdouble m[16];
         glGetDoublev(GL_MODELVIEW_MATRIX, m);
         GLdouble p[16];
@@ -222,7 +230,7 @@ void mouseCallback(int button, int state, int x, int y)
         GLint viewport[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
         GLdouble X, Y, Z;
-        gluUnProject(x, y, z, m, p, viewport, &X, &Y, &Z);
+        gluUnProject(clipX, clipY, 0, m, p, viewport, &X, &Y, &Z);
 //        vis->add_seed(X, Y, Z);
         vis->add_seed(x, y, 0);
     }
@@ -333,7 +341,7 @@ int orbit_view(int mx, int my)
 
     eye[0] = lookat[0] - neye[0];
     eye[1] = lookat[1] - neye[1];
-    eye[2] = lookat[2] - neye[2];
+    eye[2] = abs(lookat[2] - neye[2]);
 
     last_mx=mx; last_my=my;
 }
@@ -529,7 +537,11 @@ int main(int argc, char **argv)
     eye[1] = 0;
     eye[2] = 100;
 
-    cout <<  vis->gridHeight << endl;
+    glEnable(GL_LIGHT0);
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 
     glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
     return 0;
