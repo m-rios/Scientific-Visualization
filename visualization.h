@@ -73,7 +73,7 @@ public:
     float min_hue=0, max_hue=0, min_sat=1, max_sat=1; //parameters for the user-defined colormap
     std::deque<std::array<fftw_real*, 2>> v_volume; //time as z 3D volume of velocity field
     int volume_instances = 50; //Number of time instances to store in the volume
-    GLdouble dt = 5; //Integration step for streamtubes
+    GLdouble dt = 20; //Integration step for streamtubes
     int max_t = 100; //Max integration time for streamtubes
 
     GLfloat light_ambient[4] = { 1, 1, 1, 1.0 };

@@ -671,6 +671,19 @@ void Visualization::draw_tubes()
 
         streamlines.push_back(streamline);
     }
+
+    //draw the lines (not efficient on a second, i know)
+    for(auto line:streamlines)
+    {
+        for (int i = 0; i < line.size()-1; i++)
+        {
+            glBegin(GL_LINES);
+            glColor3b(1, 1, 1);
+            glVertex3d(line[i][0], line[i][1], line[i][2]);
+            glVertex3d(line[i+1][0], line[i+1][1], line[i+1][2]);
+            glEnd();
+        }
+    }
 }
 
 void Visualization::light()
