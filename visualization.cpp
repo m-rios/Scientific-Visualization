@@ -424,7 +424,7 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
     //Prepare dataset for height plot if enabled
     size_t dim = sim->DIM * 2*(sim->DIM/2+1);
@@ -442,11 +442,34 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
 
         display_dataset = old_display_dataset;
         apply_mode = old_apply_mode;
+
+        glBegin(GL_TRIANGLES);
+
+        glTexCoord1f(0.0f);
+        glNormal3f(0, 0.25f, 1);
+        glVertex3f(0, 0, 0);
+        glVertex3f(400, 0, 0);
+        glVertex3f(400, 400, 100);
+
+        glVertex3f(0, 0, 0);
+        glVertex3f(0, 400, 100);
+        glVertex3f(400, 400, 100);
+
+        glVertex3f(0, 400, 100);
+        glVertex3f(400, 400, 100);
+        glVertex3f(400, 800, 0);
+
+        glVertex3f(0, 400, 100);
+        glVertex3f(0, 800, 0);
+        glVertex3f(400, 800, 0);
+
+        glEnd();
     }
 
     int idx, idx0, idx1, idx2, idx3;
     double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     glBegin(GL_TRIANGLES);
+    glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
     for (int j = 0; j < sim->DIM - 1; j++)
     {
@@ -480,19 +503,19 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
             v2 = dataset[idx2];
             v3 = dataset[idx3];
 
-            glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
-            glTexCoord1f(v1);    glVertex3f(px1,py1, pz1);
-            glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
+            glTexCoord1f(v0);    glNormal3f(0, 0, 1);glVertex3f(px0,py0, pz0);
+            glTexCoord1f(v1);    glNormal3f(0, 0, 1);glVertex3f(px1,py1, pz1);
+            glTexCoord1f(v2);    glNormal3f(0, 0, 1);glVertex3f(px2,py2, pz2);
 
-            glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
-            glTexCoord1f(v3);    glVertex3f(px3,py3, pz3);
-            glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
+            glTexCoord1f(v0);    glNormal3f(0, 0, 1);glVertex3f(px0,py0, pz0);
+            glTexCoord1f(v3);    glNormal3f(0, 0, 1);glVertex3f(px3,py3, pz3);
+            glTexCoord1f(v2);    glNormal3f(0, 0, 1);glVertex3f(px2,py2, pz2);
 
         }
     }
     glEnd();
     glDisable(GL_TEXTURE_1D);
-    glEnable(GL_COLOR_MATERIAL);
+    glDisable(GL_COLOR_MATERIAL);
 //    draw_legend(min_v, max_v);
 }
 
@@ -504,24 +527,38 @@ void Visualization::draw_seeds()
         GLUquadricObj* pQuadric = gluNewQuadric();
         gluSphere(pQuadric, 5, 32, 8);
         glTranslated(-seed[0], -seed[1], -seed[2]); //For some reason glLoadIdentity doesn't work here
-//        glLoadIdentity();
     }
-
-//    glTranslated(200, 200, 0);
-//    GLUquadricObj* pQuadric = gluNewQuadric();
-//    gluSphere(pQuadric, 5, 32, 8);
-//    glLoadIdentity();
-//    glTranslated(300, 300, 0);
-//    pQuadric = gluNewQuadric();
-//    gluSphere(pQuadric, 5, 32, 8);
-
 }
 
 void Visualization::move_seed(GLdouble x, GLdouble y, GLdouble z)
 {
     if (seeds.size() > 0)
         seeds.back() = {x, y, z};
-    printf("Meh\n");
+}
+
+void Visualization::draw_tubes()
+{
+    for (auto seed:seeds)
+    {
+
+    }
+}
+
+void Visualization::light()
+{
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+    GLfloat whiteSpecularMaterial[] = {1.0, 1.0, 1.0};
+    GLfloat diffuseMaterial[] = {0.9, 0.0, 0.0};
+    GLfloat mShininess = 128;
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, whiteSpecularMaterial);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuseMaterial);
+    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, mShininess);
+
 }
 
 //visualize: This is the main visualization function
@@ -534,6 +571,9 @@ void Visualization::visualize(void)
     fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
+    light_position[0] = ((GLfloat)gridWidth)/2.0f;
+    light_position[1] = ((GLfloat)gridHeight)/2.0f;
+
     glDisable(GL_LIGHTING);
 
     if (height_plot)
@@ -543,18 +583,24 @@ void Visualization::visualize(void)
     }
 
 	if (draw_smoke)
+    {
+        light();
         draw_smoke_surface(dataset, min_v, max_v);
+    }
 
     if (stream_tubes)
     {
         glEnable(GL_LIGHTING);
         draw_seeds();
 
-//        glTranslated(gridWidth/2.0f-100, gridHeight/2.0f-100, 50);
-//        GLUquadricObj* pQuadric = gluNewQuadric();
-//        gluSphere(pQuadric, 50, 32, 8);
-//        glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
+        draw_tubes();
+
+        glTranslated(gridWidth/2.0f-100, gridHeight/2.0f-100, 50);
+        GLUquadricObj* pQuadric = gluNewQuadric();
+        gluSphere(pQuadric, 50, 32, 8);
+        glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
     }
+
 
 	if (draw_vecs)
 	{
@@ -667,5 +713,8 @@ void Visualization::create_textures()					//Create one 1D texture for each of th
 void Visualization::do_one_simulation_step(void)
 {
     sim->do_one_simulation_step();
+    v_volume.push({sim->vx, sim->vy});
+    if (v_volume.size() > 50)
+        v_volume.pop();
     glutPostRedisplay();
 }

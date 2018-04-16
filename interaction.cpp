@@ -565,6 +565,12 @@ int main(int argc, char **argv)
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
     glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 
+    GLfloat whiteSpecularMaterial[] = {1.0, 1.0, 0.0};
+    GLfloat mShininess[] = {128};
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, whiteSpecularMaterial);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, mShininess);
+
     glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
     return 0;
 }

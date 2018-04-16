@@ -13,6 +13,7 @@
 #include <cassert>
 #include <vector>
 #include <array>
+#include <queue>
 
 #ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
@@ -69,6 +70,12 @@ public:
     int stream_tubes = 0;
     std::vector<std::array<GLdouble, 3>> seeds; //Location of the streamtube seeds
     float min_hue=0, max_hue=0, min_sat=1, max_sat=1; //parameters for the user-defined colormap
+    std::queue<std::array<fftw_real*, 2>> v_volume; //time as z 3D volume of velocity field
+
+    GLfloat light_ambient[4] = { 1, 1, 1, 1.0 };
+    GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_position[4] = { ((GLfloat)gridWidth)/2.0f, ((GLfloat)gridHeight)/2.0f, hp_height+50, 1.0 };
 
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);
@@ -93,5 +100,7 @@ public:
     void remove_seed();
     void draw_seeds();
     void move_seed(GLdouble x, GLdouble y, GLdouble z);
+    void draw_tubes();
+    void light();
 };
 #endif //SCIENTIFIC_VISUALIZATION_VISUALIZATION_H
