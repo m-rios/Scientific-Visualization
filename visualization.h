@@ -92,5 +92,6 @@ public:
     void add_seed(GLdouble x, GLdouble y, GLdouble z);
     void remove_seed();
     void draw_seeds();
+    void move_seed(GLdouble x, GLdouble y, GLdouble z);
 };
 #endif //SCIENTIFIC_VISUALIZATION_VISUALIZATION_H

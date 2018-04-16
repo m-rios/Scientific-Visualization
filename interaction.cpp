@@ -45,6 +45,8 @@ GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
 GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
 GLfloat light_position[4] = { ((GLfloat)vis->gridWidth)/2.0f, ((GLfloat)vis->gridHeight)/2.0f, 800.0, 1.0 };
 
+int seed_x, seed_y, seed_z;
+
 
 using namespace std;
 
@@ -421,6 +423,23 @@ void update_custom_hue(int control)
     vis->create_textures();
 }
 
+void seed_spawn_cb(int control)
+{
+    if (control == 0) //Add seed
+    {
+        vis->add_seed(seed_x, seed_y, seed_z);
+    }
+    else //Remove seed
+    {
+        vis->remove_seed(); //Remove last inserted seed
+    }
+}
+
+void seed_position_cb(int control)
+{
+    vis->move_seed((GLdouble) seed_x, (GLdouble) seed_y, (GLdouble) seed_z);
+}
+
 //main: The main program
 int main(int argc, char **argv)
 {
@@ -517,8 +536,11 @@ int main(int argc, char **argv)
 
     GLUI_Panel *stream_tubes_panel = new GLUI_Panel(glui, "Stream tubes options");
     glui->add_checkbox_to_panel(stream_tubes_panel, "Enable stream tubes", &vis->stream_tubes, -1, enable_3d_view); //At some point this, height plots and basic have to be changed to radius group
-
-
+    glui->add_button_to_panel(stream_tubes_panel, "Add seed", 0, seed_spawn_cb);
+    glui->add_button_to_panel(stream_tubes_panel, "Remove seed", 1, seed_spawn_cb);
+    glui->add_spinner_to_panel(stream_tubes_panel, "x", GLUI_SPINNER_INT, &seed_x, 0, seed_position_cb)->set_int_limits(0, 10000);
+    glui->add_spinner_to_panel(stream_tubes_panel, "y", GLUI_SPINNER_INT, &seed_y, 0, seed_position_cb)->set_int_limits(0, 10000);
+    glui->add_spinner_to_panel(stream_tubes_panel, "z", GLUI_SPINNER_INT, &seed_z, 0, seed_position_cb)->set_int_limits(0, 10000);
 
     GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &vis->n_colors, -1, color_bands_cb);
     color_bands_spinner->set_int_limits(3, 256);

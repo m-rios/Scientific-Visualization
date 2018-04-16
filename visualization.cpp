@@ -517,6 +517,13 @@ void Visualization::draw_seeds()
 
 }
 
+void Visualization::move_seed(GLdouble x, GLdouble y, GLdouble z)
+{
+    if (seeds.size() > 0)
+        seeds.back() = {x, y, z};
+    printf("Meh\n");
+}
+
 //visualize: This is the main visualization function
 void Visualization::visualize(void)
 {
@@ -543,10 +550,10 @@ void Visualization::visualize(void)
         glEnable(GL_LIGHTING);
         draw_seeds();
 
-        glTranslated(gridWidth/2.0f-100, gridHeight/2.0f-100, 50);
-        GLUquadricObj* pQuadric = gluNewQuadric();
-        gluSphere(pQuadric, 50, 32, 8);
-        glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
+//        glTranslated(gridWidth/2.0f-100, gridHeight/2.0f-100, 50);
+//        GLUquadricObj* pQuadric = gluNewQuadric();
+//        gluSphere(pQuadric, 50, 32, 8);
+//        glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
     }
 
 	if (draw_vecs)
