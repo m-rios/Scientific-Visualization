@@ -21,7 +21,7 @@
 
 
 //--- SIMULATION PARAMETERS ------------------------------------------------------------------------
-const int DIM = 50;				//size of simulation grid
+const int DIM = 10;				//size of simulation grid
 double dt = 0.4;				//simulation time step
 float visc = 0.001;			//fluid viscosity
 fftw_real *vx, *vy;             //(vx,vy)   = velocity field at the current moment
@@ -35,7 +35,7 @@ int   winWidth, winHeight;      //size of the graphics window, in pixels
 int   gridWidth, gridHeight;    //size of the simulation grid in pixels
 fftw_real  wn, hn;              //size of the grid cell in pixels
 int   color_dir = 0;            //use direction color-coding or not
-float vec_scale = 400;			//scaling of hedgehogs
+float vec_scale = 600;			//scaling of hedgehogs
 int   draw_smoke = 1;           //draw the smoke or not
 int   draw_vecs = 0;            //draw the vector field or not
 int draw_iLines = 0;
@@ -45,7 +45,7 @@ const int COLOR_HEATMAP=2;
 int   scalar_col = 1;           //method for scalar coloring
 int   frozen = 0;               //toggles on/off the animation
 //todo: to be dynamically set by the user in the UI
-float isoValue = 0.80;          //Isovalue set by the user
+float isoValue = 0.50;          //Isovalue set by the user
 int n_values = 0;
 int   legend_size = 50;
 
@@ -329,8 +329,17 @@ void set_colormap(float vy)
 		rainbow(vy,&R,&G,&B);
     else if (scalar_col==COLOR_HEATMAP)
         heatmap(vy, &R, &G, &B);
-
-	glColor3f(R,G,B);
+    if (typeGlyph != 1) {
+        glColor3f(R, G, B);
+    } else {
+        GLfloat color[] = {R,G,B};
+        glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE,color);
+        glMaterialfv(GL_FRONT, GL_SPECULAR, color);
+        glMaterialf(GL_FRONT, GL_SHININESS, 30);
+        glEnable(GL_LIGHTING);                // so the renderer considers light
+        glEnable(GL_LIGHT0);
+        glShadeModel(GL_SMOOTH); //Gouroud shading
+    }
 }
 
 void get_colormap(float vy, float *R, float *G, float *B)
@@ -684,7 +693,7 @@ float intersection_point(float pi,float pj,float vi, float vj)
 int isoDecider(float j, float k) {
 //    if(((j > k)?((j - k)> 0.0001 && (j - k) < 10000):(k - j) > 0.0001 && (k - j) < 10000))
 //    {
-        if ((j >= isoValue && k <= isoValue) || (j <= isoValue && k >= isoValue)){
+        if ((j >= isoValue && k <= isoValue) || (j <= isoValue && k >= isoValue )){
             return (1);
         } else return (0);
 
@@ -703,73 +712,75 @@ void compute_isolines()
     int lookuptable[(DIM)*(DIM)][4];
     int yIdx = 0 ,dec = 0,temp = 0;
     int        i, j;
-    for (i = 0;i < ((DIM -1 )*(DIM -1)); i++) // initialized the array to zeros
-        for (j = 0;j<4;j++) {
-            lookuptable[i][j] = 0;
+//    for (i = 0;i < ((DIM -1 )*(DIM -1)); i++) // initialized the array to zeros
+//        for (j = 0;j<4;j++) {
+//            lookuptable[i][j] = 0;
+//        }
+    for (j = 0;j < DIM; j++) {
+        for (i = 0; i < DIM; i++)  {
+            for (int k=0;k<4;k++) {
+                lookuptable[j * DIM + i][k] = 0;
+            }
         }
+    }
     fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(DIM + 1);   // Grid cell width
     fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(DIM + 1);  // Grid cell heigh
 
     //Check the marching squares patterns and determine the sides to join.
     glBegin(GL_LINES);
     glColor3f(0.0,0.0,0.0);
-    for (j = 0;j < DIM - 1; j++) {
-        for (i = 0; i < DIM - 1; i++) {
+    for (j = 0;j < DIM; j++) {
+        for (i = 0; i < DIM; i++) {
 
-            int v0x = wn + (fftw_real)i * wn;
-            int v0y = hn + (fftw_real)j * hn;
+            int v0x = wn + (fftw_real) i * wn;
+            int v0y = hn + (fftw_real) j * hn;
             int idx0 = (j * DIM) + i;
 
 
-            int v1x = wn + (fftw_real)i * wn;
-            int v1y = hn + (fftw_real)(j + 1) * hn;
+            int v1x = wn + (fftw_real) i * wn;
+            int v1y = hn + (fftw_real) (j + 1) * hn;
             int idx1 = ((j + 1) * DIM) + i;
 
 
-            int v2x = wn + (fftw_real)(i + 1) * wn;
-            int v2y = hn + (fftw_real)(j + 1) * hn;
+            int v2x = wn + (fftw_real) (i + 1) * wn;
+            int v2y = hn + (fftw_real) (j + 1) * hn;
             int idx2 = ((j + 1) * DIM) + (i + 1);
 
 
-            int v3x = wn + (fftw_real)(i + 1) * wn;
-            int v3y = hn + (fftw_real)j * hn;
+            int v3x = wn + (fftw_real) (i + 1) * wn;
+            int v3y = hn + (fftw_real) j * hn;
             int idx3 = (j * DIM) + (i + 1);
 
             fftw_real r0, r1, r2, r3;
 
-            r0 = rho[idx0] ;
-            r1 = rho[idx1] ;
-            r2 = rho[idx2] ;
-            r3 = rho[idx3] ;
+            r0 = rho[idx0];
+            r1 = rho[idx1];
+            r2 = rho[idx2];
+            r3 = rho[idx3];
 
-            if (r0 > isoValue)
-            {lookuptable[i + j][yIdx] = 1;}
-            if (r1 > isoValue)
-            {lookuptable[i + j][yIdx +1] = 1;}
-            if (r2 > isoValue)
-            {lookuptable[i + j][yIdx + 2] = 1;}
-            if (r3 > isoValue)
-            {lookuptable[i + j][yIdx + 3] = 1;}
+            if (r0 >= isoValue) { lookuptable[j * DIM + i][yIdx] = 1; }
+            if (r1 >= isoValue) { lookuptable[j * DIM + i][yIdx + 1] = 1; }
+            if (r2 >= isoValue) { lookuptable[j * DIM + i][yIdx + 2] = 1; }
+            if (r3 >= isoValue) { lookuptable[j * DIM + i][yIdx + 3] = 1; }
 
-            for (int k=0;k<4;k++)
-            {
-                temp = lookuptable[i+j][k];
+            for (int k = 3; k >= 0; k--) {
+                temp = lookuptable[j * DIM + i][k];
                 dec = dec + temp * pow(2, k);
             }
 // Dont remove the below section, handy for viewing the grid
-//            glVertex2f(v0x,v0y);
-//            glVertex2f(v1x,v1y);
-//            glVertex2f(v2x,v2y);
-//            glVertex2f(v3x,v3y);
-//
-//            glVertex2f(v0x,v0y);
-//            glVertex2f(v3x,v3y);
-//            glVertex2f(v1x,v1y);
-//            glVertex2f(v2x,v2y);
+            glVertex2f(v0x,v0y);
+            glVertex2f(v1x,v1y);
+            glVertex2f(v2x,v2y);
+            glVertex2f(v3x,v3y);
+
+            glVertex2f(v0x,v0y);
+            glVertex2f(v3x,v3y);
+            glVertex2f(v1x,v1y);
+            glVertex2f(v2x,v2y);
             switch (dec) {
                 case 1 :
                 case 14:
-                    if (isoDecider(r0,r3) && isoDecider(r2,r3)) {
+                    if (isoDecider(r0, r3) && isoDecider(r2, r3)) {
 
                         glVertex2f(intersection_point(v0x, v3x, r0, r3),
                                    intersection_point(v0y, v3y, r0, r3));
@@ -780,7 +791,7 @@ void compute_isolines()
 
                 case 2 :
                 case 13:
-                    if (isoDecider(r1,r2) && isoDecider(r3,r2)) {
+                    if (isoDecider(r1, r2) && isoDecider(r3, r2)) {
                         glVertex2f(intersection_point(v1x, v2x, r1, r2),
                                    intersection_point(v1y, v2y, r1, r2));
                         glVertex2f(intersection_point(v3x, v2x, r3, r2),
@@ -789,7 +800,7 @@ void compute_isolines()
                     break;
                 case 3 :
                 case 12:
-                    if (isoDecider(r0,r3) && isoDecider(r1,r2)) {
+                    if (isoDecider(r0, r3) && isoDecider(r1, r2)) {
                         glVertex2f(intersection_point(v0x, v3x, r0, r3),
                                    intersection_point(v0y, v3y, r0, r3));
                         glVertex2f(intersection_point(v1x, v2x, r1, r2),
@@ -798,7 +809,7 @@ void compute_isolines()
                     break;
                 case 4 :
                 case 11:
-                    if (isoDecider(r0,r1) && isoDecider(r2,r1)) {
+                    if (isoDecider(r0, r1) && isoDecider(r2, r1)) {
                         glVertex2f(intersection_point(v0x, v1x, r0, r1),
                                    intersection_point(v0y, v1y, r0, r1));
                         glVertex2f(intersection_point(v2x, v1x, r2, r1),
@@ -808,35 +819,37 @@ void compute_isolines()
                 case 5 :
                 case 10:
 
-                    srand(time(NULL));
-                    if ((rand()%10) >= 5) {
+                    //srand(time(NULL));
+                    if ((rand() % 10) >= 5) {
                         if ((isoDecider(r1, r0) && isoDecider(r1, r2)) &&
                             (isoDecider(r3, r1) && isoDecider(r3, r2))) {
-                                glVertex2f(intersection_point(v1x, v0x, r1, r0),
-                                           intersection_point(v1y, v0y, r1, r0));
-                                glVertex2f(intersection_point(v1x,v2x,r1,r2),
-                                           intersection_point(v1y,v2y,r1,r2));
-                                glVertex2f(intersection_point(v3x,v1x,r3,r1),
-                                           intersection_point(v3y,v1y,r3,r1));
-                                glVertex2f(intersection_point(v3x,v2x,r3,r2),
-                                           intersection_point(v3y,v2y,r3,r2));
-                            }
-                    } else if ((isoDecider(r1,r0) && isoDecider(r3,r0)) &&
-                               (isoDecider(r1,r2)) && isoDecider(r3,r2)) {
+                            glVertex2f(intersection_point(v1x, v0x, r1, r0),
+                                       intersection_point(v1y, v0y, r1, r0));
+                            glVertex2f(intersection_point(v1x, v2x, r1, r2),
+                                       intersection_point(v1y, v2y, r1, r2));
+                            glVertex2f(intersection_point(v3x, v1x, r3, r1),
+                                       intersection_point(v3y, v1y, r3, r1));
+                            glVertex2f(intersection_point(v3x, v2x, r3, r2),
+                                       intersection_point(v3y, v2y, r3, r2));
+                        }
+                    } else {
+                        if ((isoDecider(r1, r0) && isoDecider(r3, r0)) &&
+                            (isoDecider(r1, r2)) && isoDecider(r3, r2)) {
 
-                                glVertex2f(intersection_point(v1x,v0x,r1,r0),
-                                           intersection_point(v1y,v0y,r1,r0));
-                                glVertex2f(intersection_point(v3x,v0x,r3,r0),
-                                           intersection_point(v3y,v0y,r3,r0));
-                                glVertex2f(intersection_point(v1x,v2x,r1,r2),
-                                           intersection_point(v1y,v2y,r1,r2));
-                                glVertex2f(intersection_point(v3x,v2x,r3,r2),
-                                           intersection_point(v3y,v2y,r3,r2));
+                            glVertex2f(intersection_point(v1x, v0x, r1, r0),
+                                       intersection_point(v1y, v0y, r1, r0));
+                            glVertex2f(intersection_point(v3x, v0x, r3, r0),
+                                       intersection_point(v3y, v0y, r3, r0));
+                            glVertex2f(intersection_point(v1x, v2x, r1, r2),
+                                       intersection_point(v1y, v2y, r1, r2));
+                            glVertex2f(intersection_point(v3x, v2x, r3, r2),
+                                       intersection_point(v3y, v2y, r3, r2));
+                        }
                     }
                     break;
                 case 6 :
                 case 9 :
-                    if (isoDecider(r1,r0) && isoDecider(r2,r3)) {
+                    if (isoDecider(r1, r0) && isoDecider(r2, r3)) {
                         glVertex2f(intersection_point(v1x, v0x, r1, r0),
                                    intersection_point(v1y, v0y, r1, r0));
                         glVertex2f(intersection_point(v2x, v3x, r2, r3),
@@ -845,7 +858,7 @@ void compute_isolines()
                     break;
                 case 7 :
                 case 8 :
-                    if (isoDecider(r1,r0) && isoDecider(r3,r0)) {
+                    if (isoDecider(r1, r0) && isoDecider(r3, r0)) {
                         glVertex2f(intersection_point(v1x, v0x, r1, r0),
                                    intersection_point(v1y, v0y, r1, r0));
                         glVertex2f(intersection_point(v3x, v0x, r3, r0),
@@ -853,13 +866,22 @@ void compute_isolines()
                     }
                     break;
                 default:
-                    break;//case 0 and 16
 
+                    break;//case 0 and 16
             }
-            dec = 0;yIdx = 0;
+        }
+        dec = 0;yIdx = 0;
+    }
+            glEnd();
+    for (int j = 0;j < DIM; j++){
+        for (int i = 0; i < DIM; i++){
+            for (int k = 3; k >= 0; k--) {
+                printf("lookuptable[%d][%d]::%d ",((j*DIM)+i),k,lookuptable[j * DIM + i][k]);
+            }
+            printf("\n");
         }
     }
-    glEnd();
+printf("completed");
 }
 
 //visualize: This is the main visualization function
@@ -933,27 +955,57 @@ void visualize(void)
                     if (vGlyph == 0)//fluid velocity
                     {
                         double magV = sqrt(pow(vx[idx], 2) + pow(vy[idx], 2));
-                        double angleV = atan2(vx[idx], vy[idx]);
+                        double angleV = atan2(vy[idx], vx[idx]);
                         double deg = angleV *(180/3.1415927);
-                        glTranslatef(i*wn, j*hn, -5.0);
-                        //todo:apply shading,scaling and direction correction
+                        glTranslatef(i*wn, j*hn, 0.0);
                         glRotatef(90,  0.0, 1.0, 0.0);
                         glRotatef(-deg, 1.0, 0.0, 0.0);
-                        //glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
                         glutSolidCone(5.0, magV * 500, 20, 20);
                         glLoadIdentity();
                     } else if (vGlyph == 1) // force
                     {
                         double magF = sqrt(pow(fx[idx], 2) + pow(fy[idx], 2));
-                        double angleF = atan2(fx[idx], fy[idx]);
+                        double angleF = atan2(fy[idx], fx[idx]);
                         double deg = angleF *(180/3.1415927);
-                        glutSolidCone(magF * 200, magF * 200, 20, 20);
-                        glTranslatef(0.0,hn, 0.0);
+                        glTranslatef(i*wn, j*hn, 0.0);
+                        glRotatef(90,  0.0, 1.0, 0.0);
+                        glRotatef(-deg, 1.0, 0.0, 0.0);
+                        glutSolidCone(5.0, magF * 500, 20, 20);
+                        glLoadIdentity();
                     }
                 }
             }
         } else {                  //Arrow glyph section
+            for (j = 0; j < DIM; j++) {
+                for (i = 0; i < DIM; i++) {
+                    //glBegin(GL_POLYGON);
+                    idx = (j * DIM) + i;
+                    double magV = sqrt(pow(vx[idx], 2) + pow(vy[idx], 2));
+                    double angleV = atan2(vy[idx], vx[idx]);
+                    double deg = angleV *(180/3.1415927);
+                    set_colormap(dataset[idx]);
+//                    GLUquadric* $Qobj = gluNewQuadric();
+//                    gluQuadricDrawStyle( $Qobj, GLU_FILL );
+//                    gluQuadricNormals( $Qobj, GLU_SMOOTH );
+//                    gluQuadricOrientation( $Qobj, GLU_OUTSIDE );
+//                    gluQuadricTexture( $Qobj, GL_FALSE );
+//                    glTranslatef(i*wn, j*hn, -5.0);
+//                    glRotatef(90,  0.0, 1.0, 0.0);
+//                    glRotatef(-deg, 1.0, 0.0, 0.0);
+//                    //GLAPI void GLAPIENTRY gluCylinder (GLUquadric* quad, GLdouble base, GLdouble top, GLdouble height, GLint slices, GLint stacks);
+//                    gluCylinder( $Qobj, 0.25, 0.25, magV, 10, 1 );
+                   // glEnd();
 
+//                    glTranslatef(i*wn, j*hn, 0.0);
+//                    glRotatef(90,  0.0, 1.0, 0.0);
+//                    glRotatef(-deg, 1.0, 0.0, 0.0);
+//                    glutSolidCone(5.0, magV * 500, 20, 20);
+//                    glVertex2f(wn + (fftw_real) i * wn , hn + (fftw_real) j * hn);
+//                    glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
+//                               (hn + (fftw_real) j * hn) + vec_scale * sin(angleV) * magV);
+//                    glLoadIdentity();
+                }
+            }
         }
 	}
     glLoadIdentity();
