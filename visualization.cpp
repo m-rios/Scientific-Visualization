@@ -24,9 +24,9 @@ void hsv_to_rgb(float h, float s, float v, float &r, float &g, float &b)
     }
 }
 
-Visualization::Visualization(int DIM)
+Visualization::Visualization()
 {
-    sim = new Simulation(DIM);
+    sim = new Simulation();
     dn = hp_height/volume_instances;
 }
 
@@ -743,6 +743,8 @@ void Visualization::visualize(void)
         glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
     }
 
+    compute_isolines();
+
 
 	if (draw_vecs)
 	{
@@ -817,6 +819,173 @@ void Visualization::visualize(void)
 	}
 //    glLoadIdentity();
     draw_legend(min_v, max_v);
+}
+
+void Visualization::compute_isolines()
+{
+    //This is to be implemented only for density
+    //printf("Begin drawing ISOlines");
+    //todo: Need to find out why the contour is patchy or how to fill the missing links.
+    int dec = 0;
+    int        i, j;
+
+
+    //Check the marching squares patterns and determine the sides to join.
+    glBegin(GL_LINES);
+    glColor3f(0.0,0.0,0.0);
+    for (j = 0;j < sim->DIM-1; j++) {
+        for (i = 0; i < sim->DIM-1; i++) {
+
+            int v0x = wn + (fftw_real) i * wn;
+            int v0y = hn + (fftw_real) j * hn;
+            int idx0 = (j * sim->DIM) + i;
+
+
+            int v1x = wn + (fftw_real) i * wn;
+            int v1y = hn + (fftw_real) (j + 1) * hn;
+            int idx1 = ((j + 1) * sim->DIM) + i;
+
+
+            int v2x = wn + (fftw_real) (i + 1) * wn;
+            int v2y = hn + (fftw_real) (j + 1) * hn;
+            int idx2 = ((j + 1) * sim->DIM) + (i + 1);
+
+
+            int v3x = wn + (fftw_real) (i + 1) * wn;
+            int v3y = hn + (fftw_real) j * hn;
+            int idx3 = (j * sim->DIM) + (i + 1);
+
+            fftw_real r0, r1, r2, r3;
+
+            r0 = sim->rho[idx0];
+            r1 = sim->rho[idx1];
+            r2 = sim->rho[idx2];
+            r3 = sim->rho[idx3];
+
+            int code[4]{0, 0, 0, 0};
+
+            if (r0 >= isoValue) code[0] = 1;
+            if (r1 >= isoValue) code[1] = 1;
+            if (r2 >= isoValue) code[2] = 1;
+            if (r3 >= isoValue) code[3] = 1;
+
+            //binary to decimal convertion
+            for (int k = 0; k <= 3; k++)
+                dec = dec + code[k] * pow(2, k);
+// Dont remove the below section, handy for viewing the grid
+            glVertex2f(v0x, v0y);
+            glVertex2f(v1x, v1y);
+            glVertex2f(v2x, v2y);
+            glVertex2f(v3x, v3y);
+
+            glVertex2f(v0x, v0y);
+            glVertex2f(v3x, v3y);
+            glVertex2f(v1x, v1y);
+            glVertex2f(v2x, v2y);
+
+            switch (dec) {
+                case 1 :
+                case 14:
+
+                    glVertex2f(intersection_point(v2x, v3x, r2, r3),
+                               intersection_point(v2y, v3y, r2, r3));
+                    glVertex2f(intersection_point(v0x, v3x, r0, r3),
+                               intersection_point(v0y, v3y, r0, r3));
+                    break;
+
+                case 2 :
+                case 13:
+                    glVertex2f(intersection_point(v1x, v2x, r1, r2),
+                               intersection_point(v1y, v2y, r1, r2));
+                    glVertex2f(intersection_point(v3x, v2x, r3, r2),
+                               intersection_point(v3y, v2y, r3, r2));
+                    break;
+                case 3 :
+                case 12:
+                    glVertex2f(intersection_point(v1x, v2x, r1, r2),
+                               intersection_point(v1y, v2y, r1, r2));
+                    glVertex2f(intersection_point(v0x, v3x, r0, r3),
+                               intersection_point(v0y, v3y, r0, r3));
+                    break;
+                case 4 :
+                case 11:
+                    glVertex2f(intersection_point(v0x, v1x, r0, r1),
+                               intersection_point(v0y, v1y, r0, r1));
+                    glVertex2f(intersection_point(v2x, v1x, r2, r1),
+                               (intersection_point(v2y, v1y, r2, r1)));
+                    break;
+                case 5 :
+                case 10:
+
+                    //srand(time(NULL));
+                    if ((rand() % 10) >= 5) {
+                        glVertex2f(intersection_point(v0x, v1x, r0, r1),
+                                   intersection_point(v0y, v1y, r0, r1));
+                        glVertex2f(intersection_point(v2x, v0x, r2, r0),
+                                   intersection_point(v2y, v0y, r2, r0));
+                        glVertex2f(intersection_point(v0x, v3x, r0, r3),
+                                   intersection_point(v0y, v3y, r0, r3));
+                        glVertex2f(intersection_point(v2x, v3x, r2, r3),
+                                   intersection_point(v2y, v3y, r2, r3));
+                    } else {
+                        glVertex2f(intersection_point(v2x, v1x, r2, r1),
+                                   intersection_point(v2y, v1y, r2, r1));
+                        glVertex2f(intersection_point(v2x, v3x, r2, r3),
+                                   intersection_point(v2y, v3y, r2, r3));
+                        glVertex2f(intersection_point(v0x, v1x, r0, r1),
+                                   intersection_point(v0y, v1y, r0, r1));
+                        glVertex2f(intersection_point(v0x, v3x, r0, r3),
+                                   intersection_point(v0y, v3y, r0, r3));
+                    }
+                    break;
+                case 6 :
+                case 9 :
+                    glVertex2f(intersection_point(v0x, v1x, r0, r1),
+                               intersection_point(v0y, v1y, r0, r1));
+                    glVertex2f(intersection_point(v3x, v2x, r3, r2),
+                               intersection_point(v3y, v2y, r3, r2));
+                    break;
+                case 7 :
+                case 8 :
+                    glVertex2f(intersection_point(v1x, v0x, r1, r0),
+                               intersection_point(v1y, v0y, r1, r0));
+                    glVertex2f(intersection_point(v3x, v0x, r3, r0),
+                               intersection_point(v3y, v0y, r3, r0));
+                    break;
+                default:
+
+                    break;//case 0 and 16
+            }
+
+            dec = 0;
+        }
+    }
+    glEnd();
+}
+
+float Visualization::intersection_point(float pi,float pj,float vi, float vj)
+{
+
+    float q = 0.0;
+
+    if (pi < pj)    //Going in increasing direction of grid coordinates
+    {
+        if (vi > vj)
+            q = pj - (isoValue - vj)/(vi - vj)*(pj-pi);
+        else
+            q = (isoValue - vi)/(vj - vi)*(pj - pi) + pi;
+    }
+    else
+    {
+        if (vi > vj)
+            q = (isoValue - vj)/(vi - vj)*(pi - pj) + pj;
+        else
+            q = pi - (isoValue - vi)/(vj - vi)*(pi - pj);
+    }
+
+
+    printf("Q value %f between %f and %f:: \n",q,pi,pj);
+    return q;
 }
 
 void Visualization::create_textures()					//Create one 1D texture for each of the available colormaps.

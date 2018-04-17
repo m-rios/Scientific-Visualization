@@ -36,7 +36,7 @@ int spin;
 int left_button = GLUT_UP;  //left button is initially not pressed
 int right_button = GLUT_UP; //right button is initially not pressed
 int middle_button = GLUT_UP; //middle button is initially not pressed
-Visualization* vis = new Visualization(50);
+Visualization* vis = new Visualization();
 Simulation* sim = vis->sim;
 int last_my = 0;
 int last_mx = 0;
@@ -467,7 +467,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
+    glui = GLUI_Master.create_glui("Control Panel");
 
 
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );

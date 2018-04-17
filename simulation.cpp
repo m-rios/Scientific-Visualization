@@ -7,10 +7,10 @@
 //Simulation: Initialize simulation data structures as a function of the grid size 'n'.
 //                 Although the simulation takes place on a 2D grid, we allocate all data structures as 1D arrays,
 //                 for compatibility with the FFTW numerical library.
-Simulation::Simulation(int n)
+Simulation::Simulation()
 {
     int i; size_t dim;
-
+    int n = DIM;
     dim     = n * 2*(n/2+1)*sizeof(fftw_real);        //Allocate data structures
     vx       = (fftw_real*) malloc(dim);
     vy       = (fftw_real*) malloc(dim);
@@ -30,7 +30,7 @@ Simulation::Simulation(int n)
 
 void Simulation::reset_simulation(void)
 {
-    Simulation(this->DIM);
+    Simulation();
 }
 
 //FFT: Execute the Fast Fourier Transform on the dataset 'vx'.
