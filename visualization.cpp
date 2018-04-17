@@ -4,13 +4,45 @@
 
 #include "visualization.h"
 
+void hsv_to_rgb(float h, float s, float v, float &r, float &g, float &b)
+{
+    int hue = (int) (h*6);
+    float frac = 6*h-hue;
+    float lx = v*(1-s);
+    float ly = v*(1-s*frac);
+    float lz = v*(1-s*(1-frac));
+
+    switch(hue)
+    {
+        case 0:
+        case 6: r = v; g=lz; b=lx; break;
+        case 1: r=ly; g=v; b=lx; break;
+        case 2: r=lx; g=v; b=lz; break;
+        case 3: r=lx; g=ly; b=v; break;
+        case 4: r=lz; g=lx; b=v; break;
+        case 5: r=v; g=lx; b=ly; break;
+    }
+}
+
 Visualization::Visualization(int DIM)
 {
     sim = new Simulation(DIM);
+    dn = hp_height/volume_instances;
+}
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+void Visualization::add_seed(GLdouble x, GLdouble y, GLdouble z)
+{
+    //Clamp coordinates to grid domain
+    x = x < wn ? wn : x > gridWidth ? gridWidth : x;
+    y = y < hn ? hn : y > gridHeight ? gridHeight : y;
+
+    seeds.push_back({x, y, z});
+}
+
+void Visualization::remove_seed()
+{
+    if (seeds.size() > 0)
+        seeds.pop_back();
 }
 
 //rainbow: Implements a color palette, mapping the scalar 'value' to a rainbow color RGB
@@ -36,12 +68,63 @@ void Visualization::heatmap(float value, float* R, float* G, float* B)
     if (value>1)
         value=1;
 
-    //For now we don't mess with S,V, only with Hue
-    //Normalise value to [0,3] 0->Black, 1->Full red, 2-> Orange, 3->Full yellow.
-    value *= 4;
-    *R = sim->max(0, 1 - fabs(value/2-1)) + sim->max(0, 1 - fabs(value/2-2));
-    *B = sim->max(0, 1 - fabs(value - 4));
-    *G = sim->max(0, 1 - fabs(value-3)) + sim->max(0, 1 - fabs(value-4));
+    // Segments: Black-Red (value), Red-Yellow (hue), Yellow-White (saturation);
+    float r_val = 0.50; //Value at which the map is red
+    float y_val = 0.80; //Value at which the map is yellow
+
+    float h = value < r_val ? 0 : (value < y_val ? 0.166 * (value-r_val)/(y_val - r_val) : 0.166);
+    float s = value < y_val ? 1 : 1-(value - y_val)/(1 - y_val); //fully saturated colors
+    float v = value < r_val ? value/r_val : 1;
+
+    hsv_to_rgb(h, s, v, *R, *G, *B);
+
+}
+
+void Visualization::user_defined_map(float value, float* R, float* G, float* B)
+{
+    float h, s;
+    float a_hue = min_hue, b_hue = max_hue, a_sat = min_sat, b_sat = max_sat;
+    float value_hue = value, value_sat = value;
+
+    // We always interpolate from min to max values
+    if (min_hue > max_hue) //If the colormap extrema is inverted, invert the value
+    {
+        value_hue = 1 - value;
+        a_hue = max_hue;
+        b_hue = min_hue;
+    }
+
+    if (min_sat > max_sat)
+    {
+        value_sat = 1 - value;
+        a_sat = max_sat;
+        b_sat = min_sat;
+    }
+
+    if (min_hue == max_hue) //Constant hue
+    {
+        h = min_hue;
+    }
+    else //Interpolate
+    {
+        // Choose direction of smaller angle for interpolation
+        if (b_hue - a_hue < 0.5) //Counterclockwise
+        {
+            h =  value_hue * (b_hue - a_hue) + a_hue;
+        }
+        else //Clockwise
+        {
+            h =  a_hue - value_hue*(a_hue+1-b_hue);
+            if (h < 0) h = 1+h;
+        }
+    }
+
+    if (min_sat == max_sat) //Constant saturation
+        s = min_sat;
+    else //Interpolate
+        s = value_sat * (b_sat - a_sat) + a_sat;
+
+    hsv_to_rgb(h, s, 1, *R, *G, *B); //Get RGB color with constant value = 1;
 }
 
 float Visualization::conform_to_bands(float vy)
@@ -61,14 +144,7 @@ fftw_real Visualization::scale(fftw_real min, fftw_real max, fftw_real value)
 void Visualization::set_colormap(float vy)
 {
 	float R,G,B;
-    vy = conform_to_bands(vy);
-	if (scalar_col==COLOR_BLACKWHITE)
-        R = G = B = vy;
-	else if (scalar_col==COLOR_RAINBOW)
-		rainbow(vy,&R,&G,&B);
-    else if (scalar_col==COLOR_HEATMAP)
-        heatmap(vy, &R, &G, &B);
-
+    get_colormap(vy, &R, &G, &B);
 	glColor3f(R,G,B);
 }
 
@@ -81,6 +157,8 @@ void Visualization::get_colormap(float vy, float *R, float *G, float *B)
         rainbow(vy,R,G,B);
     else if (scalar_col==COLOR_HEATMAP)
         heatmap(vy, R, G, B);
+    else if (scalar_col==COLOR_CUSTOM)
+        user_defined_map(vy, R, G, B);
 }
 
 //draw text at x, y location
@@ -93,7 +171,6 @@ void Visualization::draw_text(const char* text, int x, int y)
     glTranslatef(x, y, 0.0f);
     glScalef(0.15, 0.15, 0.15);
     for( int i = 0; i < len; i++ ) {
-//        glutBitmapCharacter( GLUT_BITMAP_TIMES_ROMAN_24, text[i] );
         glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN, (int) text[i]);
     }
     glPopMatrix();
@@ -101,7 +178,11 @@ void Visualization::draw_text(const char* text, int x, int y)
 
 void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
 {
-//    glMatrixMode(GL_PROJECTION);
+    //Draw on the image plane
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0.0, (GLdouble)winWidth, 0.0, (GLdouble)winHeight, -10.0, 10.0);
+
     float step = (float) (winHeight - 2 *hn) / (float) n_colors;
 
     glEnable(GL_TEXTURE_1D);
@@ -177,11 +258,9 @@ void Visualization::find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* 
 //compute_divergence: computes from the x,y vector field the divergence and assigns it to dataset
 void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
 {
-//    fftw_real  wn = (fftw_real)gridWidth  / (fftw_real)(sim->DIM + 1);
-//    fftw_real  hn = (fftw_real)gridHeight / (fftw_real)(sim->DIM + 1);
-    for (int j = 0; j < sim->DIM - 1; j++)
+    for (int i = 0; i < sim->DIM - 1; i++)
     {
-        for (int i = 0; i < sim->DIM - 1; i++)
+        for (int j = 0; j < sim->DIM - 1; j++)
 		{
             int next_x = (j * sim->DIM) + (i + 1); //next in x
             int next_y = ((j + 1) * sim->DIM) + i; //next cell in y
@@ -232,10 +311,13 @@ void Visualization::prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_r
     //Apply transformation
     if (apply_mode == APPLY_SCALING)    //Apply scaling
     {
-		if (!dynamic_scalling) return;
         find_min_max(min_v, max_v, dataset);
-        for (int i = 0; i < dim; ++i)
-            dataset[i] = scale(*min_v, *max_v, dataset[i]);
+        if (*max_v < (fftw_real) 0.0009)
+            for (int i = 0; i < dim; ++i)
+                dataset[i] = 0;
+        else
+            for (int i = 0; i < dim; ++i)
+                dataset[i] = scale(*min_v, *max_v, dataset[i]);
     }
     else if (apply_mode == APPLY_CLAMP) //Apply clamping
     {
@@ -337,12 +419,95 @@ void Visualization::draw_3d_grid()
     glEnd();
 }
 
+//Set the normal for the vertex at grid coordiantes i, j
+void Visualization::set_normal(int i, int j, float value, fftw_real *dataset)
+{
+    std::vector<std::array<float, 3>> normals; //Adjacent patch normals
+    float hnf = (float) hn;
+    float wnf = (float) wn;
+    float z = 0;
+
+    if (i > 0 && j < sim->DIM-1) //Upper left patch
+    {
+        //Up vector
+        z = (float) dataset[(j+1)*sim->DIM + i];
+        float up[3] = {0, hnf, z - value};
+        //Left vector
+        z = (float) dataset[j*sim->DIM + (i-1)];
+        float left[3] = {-wnf, 0, z-value};
+        float n[3];
+        crossproduct(up, left, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    if (i < sim->DIM-1 && j < sim->DIM-1) //Upper right patches
+    {
+        //Up vector
+        z = (float) dataset[(j+1)*sim->DIM + i];
+        float up[3] = {0, hnf, z - value};
+        //Up-right vector
+        z = (float) dataset[(j+1)*sim->DIM + (i+1)];
+        float upright[3] = {wnf, hnf, z - value};
+        //Right vector
+        z = (float) dataset[j*sim->DIM + (i+1)];
+        float right[3] = {wnf, 0, z-value};
+        float n[3];
+        crossproduct(upright, up, n);
+        normals.push_back({n[0], n[1], n[2]});
+        crossproduct(right, upright, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    if (i < sim->DIM-1 && j > 0) //Lower right patch
+    {
+        //Down vector
+        z = (float) dataset[(j-1)*sim->DIM + i];
+        float down[3] = {0, -hnf, z - value};
+        //Right vector
+        z = (float) dataset[j*sim->DIM + (i+1)];
+        float right[3] = {wnf, 0, z-value};
+        float n[3];
+        crossproduct(down, right, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    if (i > 0 && j > 0) //Lower left patches
+    {
+        //Down vector
+        z = (float) dataset[(j-1)*sim->DIM + i];
+        float down[3] = {0, -hnf, z - value};
+        //Left vector
+        z = (float) dataset[j*sim->DIM + (i-1)];
+        float left[3] = {-wnf, 0, z-value};
+        //Downleft vector
+        z = (float) dataset[(j-1)*sim->DIM + (i-1)];
+        float downleft[3] = {-wnf, -hnf, z-value};
+        float n[3];
+        crossproduct(left, downleft, n);
+        normals.push_back({n[0], n[1], n[2]});
+        crossproduct(downleft, down, n);
+        normals.push_back({n[0], n[1], n[2]});
+    }
+
+    //Average normals
+    float final_normal[3] = {0.0f, 0.0f, 0.0f};
+
+    for (auto n:normals)
+    {
+        final_normal[0] += n[0];
+        final_normal[1] += n[1];
+        final_normal[2] += n[2];
+    }
+
+    normalize(final_normal);
+
+    glNormal3fv(final_normal);
+
+}
+
 void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v)
 {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-//    glDisable(GL_LIGHTING);
-//    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
     glShadeModel(GL_SMOOTH);
 
     glEnable(GL_TEXTURE_1D);
@@ -351,7 +516,7 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_DECAL);
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
     //Prepare dataset for height plot if enabled
     size_t dim = sim->DIM * 2*(sim->DIM/2+1);
@@ -374,7 +539,8 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     int idx, idx0, idx1, idx2, idx3;
     double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     glBegin(GL_TRIANGLES);
-//    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
     for (int j = 0; j < sim->DIM - 1; j++)
     {
         for (int i = 0; i < sim->DIM - 1; i++)
@@ -407,20 +573,134 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
             v2 = dataset[idx2];
             v3 = dataset[idx3];
 
-            glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
-            glTexCoord1f(v1);    glVertex3f(px1,py1, pz1);
-            glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
+            glTexCoord1f(v0);    glNormal3f(0, 0, 1);glVertex3f(px0,py0, pz0);
+            glTexCoord1f(v1);    glNormal3f(0, 0, 1);glVertex3f(px1,py1, pz1);
+            glTexCoord1f(v2);    glNormal3f(0, 0, 1);glVertex3f(px2,py2, pz2);
 
-            glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
-            glTexCoord1f(v3);    glVertex3f(px3,py3, pz3);
-            glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
+            glTexCoord1f(v0);    glNormal3f(0, 0, 1);glVertex3f(px0,py0, pz0);
+            glTexCoord1f(v3);    glNormal3f(0, 0, 1);glVertex3f(px3,py3, pz3);
+            glTexCoord1f(v2);    glNormal3f(0, 0, 1);glVertex3f(px2,py2, pz2);
 
         }
     }
     glEnd();
     glDisable(GL_TEXTURE_1D);
-//    glEnable(GL_COLOR_MATERIAL);
-    draw_legend(min_v, max_v);
+    glDisable(GL_COLOR_MATERIAL);
+//    draw_legend(min_v, max_v);
+}
+
+void Visualization::draw_seeds()
+{
+    for (auto seed:seeds)
+    {
+        glTranslated(seed[0], seed[1], seed[2]);
+        GLUquadricObj* pQuadric = gluNewQuadric();
+        gluSphere(pQuadric, 5, 32, 8);
+        glTranslated(-seed[0], -seed[1], -seed[2]); //For some reason glLoadIdentity doesn't work here
+    }
+}
+
+void Visualization::move_seed(GLdouble x, GLdouble y, GLdouble z)
+{
+    if (seeds.size() > 0)
+        seeds.back() = {x, y, z};
+}
+
+void Visualization::interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fftw_real &vx, fftw_real &vy)
+{
+    int i, j, k;
+
+    i = (int) (x / wn);
+    j = (int) (y / hn);
+    k = (int) (z / dn);
+
+    //Transform coordinates to unit grid
+    double r = (x - i*wn)/wn;
+    double s = (y - j*hn)/hn;
+    double t = (z - k*dn)/dn;
+
+    //Compute basis functions
+    double b1 = (1-r)*(1-s)*(1-t);
+    double b2 = r*(1-s)*(1-t);
+    double b3 = r*s*(1-t);
+    double b4 = (1-r)*s*(1-t);
+    double b5 = (1-r)*(1-s)*t;
+    double b6 = r*(1-s)*t;
+    double b7= r*s*t;
+    double b8 = (1-r)*s*t;
+
+    //Get values of the hexahedron vertices
+    double x1 = v_volume[k][0][j*sim->DIM+i];       double y1 = v_volume[k][1][j*sim->DIM+i];
+    double x2 = v_volume[k][0][j*sim->DIM+i+1];     double y2 = v_volume[k][1][j*sim->DIM+i+1];
+    double x3 = v_volume[k][0][(j+1)*sim->DIM+i+1]; double y3 = v_volume[k][1][(j+1)*sim->DIM+i+1];
+    double x4 = v_volume[k][0][(j+1)*sim->DIM+i];   double y4 = v_volume[k][1][(j+1)*sim->DIM+i];
+
+    double x5 = v_volume[k+1][0][j*sim->DIM+i];       double y5 = v_volume[k+1][1][j*sim->DIM+i];
+    double x6 = v_volume[k+1][0][j*sim->DIM+i+1];     double y6 = v_volume[k+1][1][j*sim->DIM+i+1];
+    double x7 = v_volume[k+1][0][(j+1)*sim->DIM+i+1]; double y7 = v_volume[k+1][1][(j+1)*sim->DIM+i+1];
+    double x8 = v_volume[k+1][0][(j+1)*sim->DIM+i];   double y8 = v_volume[k+1][1][(j+1)*sim->DIM+i];
+
+    //Interpolate
+    vx = b1*x1 + b2*x2 + b3*x3 + b4*x4 + b5*x5 + b6*x6 + b7*x7 + b8*x8;
+    vy = b1*y1 + b2*y2 + b3*y3 + b4*y4 + b5*y5 + b6*y6 + b7*y7 + b8*y8;
+}
+
+void Visualization::draw_tubes()
+{
+    std::vector<std::vector<std::array<GLdouble, 3>>> streamlines;
+
+    for (auto seed:seeds) //for all the seed points
+    {
+        std::vector<std::array<GLdouble, 3>> streamline;
+
+        GLdouble x=seed[0], y=seed[1], z=seed[2], t=0;
+        fftw_real vx, vy;
+
+        while (z < hp_height || t < max_t)
+        {
+            streamline.push_back({x, y, z});
+
+            interpolate_3d_point(x, y, z, vx, vy);
+
+            x = x + vx*dt;
+            y = y + vy*dt;
+            z = z + dt; //Must decide proper step for z
+
+            t += dt;
+        }
+
+        streamlines.push_back(streamline);
+    }
+
+    //draw the lines (not efficient on a second, i know)
+    for(auto line:streamlines)
+    {
+        for (int i = 0; i < line.size()-1; i++)
+        {
+            glBegin(GL_LINES);
+            glColor3b(1, 1, 1);
+            glVertex3d(line[i][0], line[i][1], line[i][2]);
+            glVertex3d(line[i+1][0], line[i+1][1], line[i+1][2]);
+            glEnd();
+        }
+    }
+}
+
+void Visualization::light()
+{
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+    GLfloat whiteSpecularMaterial[] = {1.0, 1.0, 1.0};
+    GLfloat diffuseMaterial[] = {0.9, 0.0, 0.0};
+    GLfloat mShininess = 128;
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, whiteSpecularMaterial);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuseMaterial);
+    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, mShininess);
+
 }
 
 //visualize: This is the main visualization function
@@ -433,11 +713,36 @@ void Visualization::visualize(void)
     fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
+    light_position[0] = ((GLfloat)gridWidth)/2.0f;
+    light_position[1] = ((GLfloat)gridHeight)/2.0f;
+
+    glDisable(GL_LIGHTING);
+
     if (height_plot)
+    {
         draw_3d_grid();
+        glEnable(GL_LIGHTING);
+    }
 
 	if (draw_smoke)
+    {
+        light();
         draw_smoke_surface(dataset, min_v, max_v);
+    }
+
+    if (stream_tubes)
+    {
+        glEnable(GL_LIGHTING);
+        draw_seeds();
+
+        draw_tubes();
+
+        glTranslated(gridWidth/2.0f-100, gridHeight/2.0f-100, 50);
+        GLUquadricObj* pQuadric = gluNewQuadric();
+        gluSphere(pQuadric, 50, 32, 8);
+        glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
+    }
+
 
 	if (draw_vecs)
 	{
@@ -494,7 +799,7 @@ void Visualization::visualize(void)
                         glRotatef(90,  0.0, 1.0, 0.0);
                         glRotatef(-deg, 1.0, 0.0, 0.0);
                         //glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
-                        glutSolidCone(10.0, magV * 200, 20, 20);
+                        glutSolidCone(10.0, magV * 150, 20, 20);
                         glLoadIdentity();
                     } else if (vGlyph == 1) // force
                     {
@@ -510,7 +815,7 @@ void Visualization::visualize(void)
 
         }
 	}
-    glLoadIdentity();
+//    glLoadIdentity();
     draw_legend(min_v, max_v);
 }
 
@@ -522,7 +827,7 @@ void Visualization::create_textures()					//Create one 1D texture for each of th
 
     int selected_map = scalar_col;
 
-    for(int i=COLOR_BLACKWHITE;i<=COLOR_HEATMAP;++i)
+    for(int i=COLOR_BLACKWHITE;i<=COLOR_CUSTOM;++i)
     {													//Generate all three textures:
         glBindTexture(GL_TEXTURE_1D,textureID[i]);		//Make i-th texture active (for setting it)
         const int size = 512;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
@@ -550,5 +855,22 @@ void Visualization::create_textures()					//Create one 1D texture for each of th
 void Visualization::do_one_simulation_step(void)
 {
     sim->do_one_simulation_step();
+
+    size_t dim = sim->DIM * 2*(sim->DIM/2+1);
+
+    fftw_real *x = (fftw_real*) malloc(dim);
+    fftw_real *y = (fftw_real*) malloc(dim);
+
+    memcpy(x, sim->vx, dim);
+    memcpy(y, sim->vy, dim);
+
+    v_volume.push_front({x, y});
+    if (v_volume.size() > volume_instances)
+    {
+        std::array<fftw_real*,2> xy = v_volume.back();
+        v_volume.pop_back();
+        free(xy[0]);
+        free(xy[1]);
+    }
     glutPostRedisplay();
 }

@@ -11,6 +11,10 @@
 #include <cstring>
 #include <cfloat>
 #include <cassert>
+#include <vector>
+#include <array>
+#include <deque>
+#include "util.h"
 
 #ifdef LINUX
 #include <GL/glut.h>            //the GLUT graphics library
@@ -27,7 +31,7 @@ public:
     Simulation *sim;
     int   winWidth, winHeight;      //size of the graphics window, in pixels
     int   gridWidth, gridHeight;    //size of the simulation grid in pixels
-    fftw_real  wn, hn;              //size of the grid cell in pixels
+    fftw_real  wn, hn, dn;          //size of the grid cell in pixels
     int   color_dir = 0;            //use direction color-coding or not
     float vec_scale = 1000;			//scaling of hedgehogs
     int   draw_smoke = 1;           //draw the smoke or not
@@ -35,6 +39,7 @@ public:
     const int COLOR_BLACKWHITE=0;   //different types of color mapping: black-and-white, rainbow, banded
     const int COLOR_RAINBOW=1;
     const int COLOR_HEATMAP=2;
+    const int COLOR_CUSTOM=3;
     int   scalar_col = 1;           //method for scalar coloring
     int   frozen = 0;               //toggles on/off the animation
 
@@ -63,14 +68,23 @@ public:
     int typeGlyph = 0;
     int hp_height = 250;
     int hp_display_dataset = 0;
+    int stream_tubes = 0;
+    std::vector<std::array<GLdouble, 3>> seeds; //Location of the streamtube seeds
+    float min_hue=0, max_hue=0, min_sat=1, max_sat=1; //parameters for the user-defined colormap
+    std::deque<std::array<fftw_real*, 2>> v_volume; //time as z 3D volume of velocity field
+    int volume_instances = 50; //Number of time instances to store in the volume
+    GLdouble dt = 20; //Integration step for streamtubes
+    int max_t = 100; //Max integration time for streamtubes
 
-    GLfloat light_ambient[4] = { 0.0, 0.0, 0.0, 1.0 };
+    GLfloat light_ambient[4] = { 1, 1, 1, 1.0 };
     GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light_position[4] = { ((GLfloat)gridWidth)/2.0f, ((GLfloat)gridHeight)/2.0f, (GLfloat) hp_height+50.0f, 1.0 };
 
     Visualization(int DIM);
     void rainbow(float value,float* R,float* G,float* B);
     void heatmap(float value, float* R, float* G, float* B);
+    void user_defined_map(float value, float* R, float* G, float* B);
     float conform_to_bands(float vy);
     fftw_real scale(fftw_real min, fftw_real max, fftw_real value);
     void set_colormap(float vy);
@@ -86,5 +100,13 @@ public:
     void create_textures();
     void do_one_simulation_step();
     void draw_3d_grid();
+    void add_seed(GLdouble x, GLdouble y, GLdouble z);
+    void remove_seed();
+    void draw_seeds();
+    void move_seed(GLdouble x, GLdouble y, GLdouble z);
+    void draw_tubes();
+    void light();
+    void set_normal(int i, int j, float value, fftw_real *dataset);
+    void interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fftw_real &vx, fftw_real &vy);
 };
 #endif //SCIENTIFIC_VISUALIZATION_VISUALIZATION_H

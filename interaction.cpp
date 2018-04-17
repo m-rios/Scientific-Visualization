@@ -6,6 +6,7 @@
 #include "GL/glui.h"
 #include "simulation.h"
 #include "visualization.h"
+#include "util.h"
 
 GLUI_RadioGroup *colormap_radio;
 GLUI_RadioGroup *glyphtype;
@@ -19,6 +20,13 @@ int segments = 0;
 GLUI_Spinner *clamp_max_spinner;
 GLUI_Spinner *clamp_min_spinner;
 GLUI_Spinner *height_spinner;
+GLUI_Spinner *min_hue_spinner;
+GLUI_Spinner *max_hue_spinner;
+GLUI_Spinner *min_sat_spinner;
+GLUI_Spinner *max_sat_spinner;
+GLUI_Spinner *seed_x_spinner;
+GLUI_Spinner *seed_y_spinner;
+GLUI_Spinner *seed_z_spinner;
 GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
@@ -36,13 +44,27 @@ int last_mx = 0;
 float eye[3]; //point representing the eye
 float lookat[3]; //point towards which eye has too point
 
+GLfloat light_ambient[4] = { 0.3, 0.3, 0.3, 1.0 };
+GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
+GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
+GLfloat light_position[4] = { ((GLfloat)vis->gridWidth)/2.0f, ((GLfloat)vis->gridHeight)/2.0f, 800.0, 1.0 };
+
+int seed_x, seed_y, seed_z;
+
+
 using namespace std;
 
 void radio_cb( int control )
 {
     switch (control)
     {
-        case RADIO_COLOR_MAP:   vis->scalar_col = colormap_radio->get_int_val();         break;
+        case RADIO_COLOR_MAP:
+            vis->scalar_col = colormap_radio->get_int_val();
+            if (vis->scalar_col != 3)
+            {min_sat_spinner->disable(); min_hue_spinner->disable(); max_hue_spinner->disable(); max_sat_spinner->disable();}
+            else
+            {min_sat_spinner->enable(); min_hue_spinner->enable(); max_hue_spinner->enable(); max_sat_spinner->enable();}
+            break;
         case RADIO_DATASET:     vis->display_dataset = dataset_radio->get_int_val();     break;
         case RADIO_GLYPH:       vis->vGlyph = (glyph_radio->get_int_val());              break;
         case RADIO_HP_DATASET:     vis->hp_display_dataset = hp_dataset_radio->get_int_val();     break;
@@ -76,6 +98,7 @@ void divergence_cb( int control )
     {
         clamp_min_spinner->set_int_limits(-1, 0);
         clamp_min_spinner->set_int_val(-1);
+
     }
     else
     {
@@ -84,32 +107,15 @@ void divergence_cb( int control )
     }
 }
 
-void enable_height_plot( int control )
+void enable_3d_view( int control )
 {
-    if (vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
     {
         glEnable(GL_DEPTH_TEST);
 
-        eye[0] = 0;
-        eye[1] = 0;
-        eye[2] = 100;
-
-        lookat[0] = vis->gridWidth/2.0f;
-        lookat[1] = vis->gridHeight/2.0f;
-    }
-    else //set default view
-    {
-//        glDisable(GL_DEPTH_TEST);
-//        eye[0] = vis->gridWidth/2.0f;
-//        eye[1] = vis->gridHeight/2.0f;
-//        eye[2] = 100;
-//
-//        lookat[0] = vis->gridWidth/2.0f;
-//        lookat[1] = vis->gridHeight/2.0f;
-
-        eye[0] = vis->gridWidth/2.0f-1;
-        eye[1] = vis->gridHeight/2.0f;
-        eye[2] = 1000;
+        eye[0] = -200;
+        eye[1] = -200;
+        eye[2] = 500;
 
         lookat[0] = vis->gridWidth/2.0f;
         lookat[1] = vis->gridHeight/2.0f;
@@ -125,14 +131,14 @@ void display(void)
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    if (vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
         glFrustum(-.5, .5, -.5, .5, 1, 10000);
     else
         glOrtho(0.0, (GLdouble)vis->winWidth, 0.0, (GLdouble)vis->winHeight, -10.0, 10.0);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    if (vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
     {
         vis->draw_3d_grid();
         gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
@@ -152,9 +158,6 @@ void reshape(int w, int h)
     GLUI_Master.get_viewport_area(&tx, &ty, &tw, &th);
     glViewport(tx, ty, tw, th);
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0.0, (GLdouble)w, 0.0, (GLdouble)h, -10.0, 10.0);
     vis->winWidth = w; vis->winHeight = h;
     vis->gridWidth = vis->winWidth - vis->legend_size - vis->legend_text_len;
     vis->gridHeight = vis->winHeight;
@@ -170,6 +173,9 @@ void reshape(int w, int h)
     }
 
     glutPostRedisplay();
+
+    seed_x_spinner->set_int_limits(0, vis->gridWidth);
+    seed_y_spinner->set_int_limits(0, vis->gridHeight);
 }
 
 //keyboard: Handle key presses
@@ -220,6 +226,24 @@ void mouseCallback(int button, int state, int x, int y)
     else if (button == GLUT_MIDDLE_BUTTON)
         middle_button = state;
 
+//    if (vis->stream_tubes && left_button == GLUT_DOWN) //place seed
+//    {
+//        GLdouble clipX = (x/vis->gridWidth)*2.0-1.0;
+//        GLdouble clipY = (y/vis->gridHeight)*2.0; // the Y is usually upside down
+//        GLdouble z;
+//        glReadPixels (clipX, clipY, 1, 1, GL_DEPTH_COMPONENT, GL_DOUBLE, &z);
+//        GLdouble m[16];
+//        glGetDoublev(GL_MODELVIEW_MATRIX, m);
+//        GLdouble p[16];
+//        glGetDoublev(GL_PROJECTION_MATRIX, p);
+//        GLint viewport[4];
+//        glGetIntegerv(GL_VIEWPORT, viewport);
+//        GLdouble X, Y, Z;
+//        gluUnProject(clipX, clipY, 0, m, p, viewport, &X, &Y, &Z);
+////        vis->add_seed(X, Y, Z);
+//        vis->add_seed(x, y, 0);
+//    }
+
     last_mx = x;
     last_my = y;
 }
@@ -265,28 +289,6 @@ void add_matter(int mx, int my)
     lmy = my;
 }
 
-void crossproduct(float a[3], float b[3], float res[3])
-{
-    res[0] = (a[1] * b[2] - a[2] * b[1]);
-    res[1] = (a[2] * b[0] - a[0] * b[2]);
-    res[2] = (a[0] * b[1] - a[1] * b[0]);
-}
-
-void normalize(float v[3])
-{
-    float l = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
-    l = 1 / (float)sqrt(l);
-
-    v[0] *= l;
-    v[1] *= l;
-    v[2] *= l;
-}
-
-float length(float v[3])
-{
-    return (float)sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-}
-
 int orbit_view(int mx, int my)
 {
     int dx = -(mx-last_mx);
@@ -326,7 +328,7 @@ int orbit_view(int mx, int my)
 
     eye[0] = lookat[0] - neye[0];
     eye[1] = lookat[1] - neye[1];
-    eye[2] = lookat[2] - neye[2];
+    eye[2] = abs(lookat[2] - neye[2]);
 
     last_mx=mx; last_my=my;
 }
@@ -353,16 +355,12 @@ void zoom(int my)
 // drag: select which action to map mouse drag to, depending on pressed button
 void drag(int mx, int my)
 {
-    if (!vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
     {
-       add_matter(mx, my);
-    }
-    else
-    {
-       if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
-       glutSetWindow(glui->get_glut_window_id());
+        if (left_button == GLUT_DOWN && right_button == GLUT_DOWN) return;  //Do nothing if both buttons pressed.
+        glutSetWindow(glui->get_glut_window_id());
 
-       if (middle_button == GLUT_DOWN)
+        if (middle_button == GLUT_DOWN)
            zoom(my);
        else
        {
@@ -371,7 +369,10 @@ void drag(int mx, int my)
            else if (right_button == GLUT_DOWN)
                orbit_view(mx, my);
        }
-
+    }
+    else
+    {
+        add_matter(mx, my);
     }
 }
 
@@ -396,6 +397,38 @@ static void TimeEvent(int te)
 void reset_simulation()
 {
     sim->reset_simulation();
+}
+
+void update_custom_hue(int control)
+{
+    if (control == 0)
+        vis->min_hue = min_hue_spinner->get_float_val()/359.0f;
+    else
+        vis->max_hue = max_hue_spinner->get_float_val()/359.0f;
+    vis->create_textures();
+}
+
+void seed_spawn_cb(int control)
+{
+    if (control == 0) //Add seed
+    {
+        vis->add_seed(seed_x, seed_y, seed_z);
+    }
+    else //Remove seed
+    {
+        vis->remove_seed(); //Remove last inserted seed
+    }
+}
+
+void seed_position_cb(int control)
+{
+    vis->move_seed((GLdouble) seed_x, (GLdouble) seed_y, (GLdouble) seed_z);
+}
+
+void heigh_cb(int control)
+{
+    seed_z_spinner->set_int_limits(0, vis->hp_height);
+    vis->dn = vis->hp_height / vis->volume_instances;
 }
 
 //main: The main program
@@ -434,7 +467,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_LEFT);
+    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
 
 
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
@@ -442,6 +475,15 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( colormap_radio, "Greyscale" );
     new GLUI_RadioButton( colormap_radio, "Rainbow" );
     new GLUI_RadioButton( colormap_radio, "Heatmap" );
+    new GLUI_RadioButton( colormap_radio, "Custom" );
+    (max_hue_spinner = glui->add_spinner_to_panel(colormap_panel, "Max hue", GLUI_SPINNER_INT, NULL, 1, update_custom_hue))->set_int_limits(0,359);
+    (min_hue_spinner = glui->add_spinner_to_panel(colormap_panel, "Min hue", GLUI_SPINNER_INT, NULL, 0, update_custom_hue))->set_int_limits(0, 359);
+    (max_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Max sat", GLUI_SPINNER_FLOAT, &vis->max_sat, 3, update_custom_hue))->set_float_limits(0,1);
+    (min_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Min sat", GLUI_SPINNER_FLOAT, &vis->min_sat, 3, update_custom_hue))->set_float_limits(0,1);
+
+    min_hue_spinner->disable(); min_sat_spinner->disable(); max_hue_spinner->disable(); max_sat_spinner->disable();
+
+
 
     GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
     dataset_radio = new GLUI_RadioGroup(dataset_panel, (&vis->display_dataset), RADIO_DATASET, radio_cb);
@@ -475,14 +517,21 @@ int main(int argc, char **argv)
     glui->add_checkbox("Render glyphs", &vis->draw_vecs);
 
     GLUI_Panel *height_plot_panel = new GLUI_Panel(glui, "Height plot options");
-    glui->add_checkbox_to_panel(height_plot_panel, "Height plot", &vis->height_plot, -1, enable_height_plot);
+    glui->add_checkbox_to_panel(height_plot_panel, "Height plot", &vis->height_plot, -1, enable_3d_view);
     hp_dataset_radio = new GLUI_RadioGroup(height_plot_panel, (&vis->hp_display_dataset), RADIO_HP_DATASET, radio_cb);
     new GLUI_RadioButton( hp_dataset_radio, "Density" );
     new GLUI_RadioButton( hp_dataset_radio, "Velocity" );
     new GLUI_RadioButton( hp_dataset_radio, "Force" );
-    height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height);
+    height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height, 0, heigh_cb);
     height_spinner->set_int_limits(50, 300);
 
+    GLUI_Panel *stream_tubes_panel = new GLUI_Panel(glui, "Stream tubes options");
+    glui->add_checkbox_to_panel(stream_tubes_panel, "Enable stream tubes", &vis->stream_tubes, -1, enable_3d_view); //At some point this, height plots and basic have to be changed to radius group
+    glui->add_button_to_panel(stream_tubes_panel, "Add seed", 0, seed_spawn_cb);
+    glui->add_button_to_panel(stream_tubes_panel, "Remove seed", 1, seed_spawn_cb);
+    (seed_x_spinner = glui->add_spinner_to_panel(stream_tubes_panel, "x", GLUI_SPINNER_INT, &seed_x, 0, seed_position_cb))->set_int_limits(0, 10000);
+    (seed_y_spinner = glui->add_spinner_to_panel(stream_tubes_panel, "y", GLUI_SPINNER_INT, &seed_y, 0, seed_position_cb))->set_int_limits(0, 10000);
+    (seed_z_spinner = glui->add_spinner_to_panel(stream_tubes_panel, "z", GLUI_SPINNER_INT, &seed_z, 0, seed_position_cb))->set_int_limits(0, 10000);
 
     GLUI_Spinner *color_bands_spinner = glui->add_spinner("Number of colours", GLUI_SPINNER_INT, &vis->n_colors, -1, color_bands_cb);
     color_bands_spinner->set_int_limits(3, 256);
@@ -501,7 +550,17 @@ int main(int argc, char **argv)
     eye[1] = 0;
     eye[2] = 100;
 
-    cout <<  vis->gridHeight << endl;
+    glEnable(GL_LIGHT0);
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+    GLfloat whiteSpecularMaterial[] = {1.0, 1.0, 0.0};
+    GLfloat mShininess[] = {128};
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, whiteSpecularMaterial);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, mShininess);
 
     glutMainLoop();			//calls do_one_simulation_step, keyboard, display, drag, reshape
     return 0;
