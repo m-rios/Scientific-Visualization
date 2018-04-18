@@ -296,7 +296,7 @@ void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *da
             int next_y = ((j + 1) * sim->DIM) + i; //next cell in y
 
             int current = (j * sim->DIM) + i;
-            dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn);	//Divergence operator
+            dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*100;	//Divergence operator
         }
     }
 }
@@ -530,22 +530,22 @@ void Visualization::set_normal(int i, int j, float value, fftw_real *dataset)
     }
 
     normalize(final_normal);
-    if (final_normal[2] < final_normal[1] || final_normal[2] < final_normal[0])
-        printf("hey\n");
     glNormal3fv(final_normal);
-    glBegin(GL_LINES);
-    int px0 = wn + (fftw_real)i * wn;
-    int py0 = hn + (fftw_real)j * hn;
-    int pz0 = value;
-    glVertex3f(px0, py0, pz0);
-    glVertex3f((px0 + final_normal[0])*10, 10*(py0 + final_normal[1]),10*( pz0 + final_normal[2]));
-    glEnd();
+    if (draw_normals)
+    {
+        glBegin(GL_LINES);
+        int px0 = wn + (fftw_real)i * wn;
+        int py0 = hn + (fftw_real)j * hn;
+        int pz0 = value;
+        glVertex3f(px0, py0, pz0);
+        glVertex3f(px0 + final_normal[0]*10, py0 + final_normal[1]*10, pz0 + final_normal[2]*10);
+        glEnd();
+    }
 }
 
 void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw_real max_v)
 {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glShadeModel(GL_SMOOTH);
 
     glEnable(GL_TEXTURE_1D);
     glBindTexture(GL_TEXTURE_1D,textureID[scalar_col]);
@@ -562,6 +562,12 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     if (height_plot)
     {
         glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+        glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+        glMaterialf(GL_FRONT, GL_SHININESS, 128);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specularMaterial);
+        glShadeModel(GL_SMOOTH);
         int old_display_dataset = display_dataset;
         int old_apply_mode = apply_mode;
 
@@ -578,7 +584,7 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
     double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     pz0 = 0;
     glEnable(GL_COLOR_MATERIAL);
-    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE); //Enable color to modify diffuse material
     for (int j = 0; j < sim->DIM - 1; j++)
     {
         for (int i = 0; i < sim->DIM - 1; i++)
@@ -611,15 +617,20 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
             v2 = dataset[idx2];
             v3 = dataset[idx3];
 
-            set_normal(i, j, pz0, dataset);
+            if (height_plot) set_normal(i, j, pz0, height_dataset);
 
             glBegin(GL_TRIANGLES);
             glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
+//            set_normal(i, j+1, pz1, dataset);
             glTexCoord1f(v1);    glVertex3f(px1,py1, pz1);
+//            set_normal(i+1, j+1, pz2, dataset);
             glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
 
+//            set_normal(i, j, pz0, dataset);
             glTexCoord1f(v0);    glVertex3f(px0,py0, pz0);
+//            set_normal(i+1, j, pz3, dataset);
             glTexCoord1f(v3);    glVertex3f(px3,py3, pz3);
+//            set_normal(i+1, j+1, pz2, dataset);
             glTexCoord1f(v2);    glVertex3f(px2,py2, pz2);
             glEnd();
         }
@@ -856,8 +867,8 @@ void Visualization::visualize(void) {
     fftw_real *dataset = (fftw_real *) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
-    light_position[0] = ((GLfloat) gridWidth) / 2.0f;
-    light_position[1] = ((GLfloat) gridHeight) / 2.0f;
+//    light_position[0] = ((GLfloat) gridWidth) / 2.0f;
+//    light_position[1] = ((GLfloat) gridHeight) / 2.0f;
 
 
     if (height_plot) {
@@ -891,32 +902,26 @@ void Visualization::visualize(void) {
             for (i = 0; i < sim->DIM; i++) {
                 for (j = 0; j < sim->DIM; j++) {
                     idx = (j * sim->DIM) + i;
-                    direction_to_color(sim->vx[idx], sim->vy[idx], color_dir);
+//                    direction_to_color(sim->vx[idx], sim->vy[idx], color_dir);
                     //mapping the scalar value of the dataset with color.
-                    if (glyph) {//User selects glyphs options
-                        set_colormap(dataset[idx]);
-                        if (vGlyph == 0)//fluid velocity
-                        {
-                            //(3.1415927 / 180.0) * angle;
-                            double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));
-                            double angleV = atan2(sim->vx[idx], sim->vy[idx]);
-                            glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
-                            glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
-                                       (hn + (fftw_real) j * hn) + vec_scale * sin(angleV) * magV);
-                        }
-
-                        if (vGlyph == 1)//force
-                        {
-                            double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
-                            double angleF = atan2(sim->fx[idx], sim->fy[idx]);
-                            glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
-                            glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
-                                       (hn + (fftw_real) j * hn) + 500 * sin(angleF) * magF);
-                        }
-                    } else {
+//                    set_colormap(dataset[idx]);
+                    if (vGlyph == 0)//fluid velocity
+                    {
+                        //(3.1415927 / 180.0) * angle;
+                        double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2)); 
+                        double angleV = atan2(sim->vy[idx], sim->vx[idx]);
                         glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
-                        glVertex2f((wn + (fftw_real) i * wn) + vec_scale * sim->vx[idx],
-                                   (hn + (fftw_real) j * hn) + vec_scale * sim->vy[idx]);
+                        glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
+                                   (hn + (fftw_real) j * hn) + vec_scale * sin(angleV) * magV);
+                    }
+
+                    if (vGlyph == 1)//force
+                    {
+                        double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2)); 
+                        double angleF = atan2(sim->fy[idx], sim->fx[idx]);
+                        glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
+                        glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
+                                   (hn + (fftw_real) j * hn) + 500 * sin(angleF) * magF);
                     }
                 }
             }
@@ -948,6 +953,7 @@ void Visualization::visualize(void) {
                         glLoadIdentity();
                     } else if (vGlyph == 1) // force
                     {
+                        printf("Force\n");
                         int index;
                          fftw_real fx, fy;
                          interpolate_2d_point(samplex, sampley, fx, fy, sim->fx, sim->fy, dataset);
@@ -1018,8 +1024,6 @@ void Visualization::visualize(void) {
                 q = pi - (isoValue - vi) / (vj - vi) * (pi - pj);
         }
 
-
-        printf("Q value %f between %f and %f:: \n", q, pi, pj);
         return q;
     }
 
@@ -1033,10 +1037,6 @@ void Visualization::compute_isolines(float isoValue) {
 
     //Check the marching squares patterns and determine the sides to join.
     glBegin(GL_LINES);
-//    glColor3f(0.0, 0.0, 0.0);
-//    glEnable(GL_LINE_SMOOTH);
-//    glLineWidth(3.0);
-    //set_colormap(isoValue);
     for (j = 0; j < sim->DIM - 1; j++) {
         for (i = 0; i < sim->DIM - 1; i++) {
 
@@ -1076,16 +1076,6 @@ void Visualization::compute_isolines(float isoValue) {
             //binary to decimal convertion
             for (int k = 0; k <= 3; k++)
                 dec = dec + code[k] * pow(2, 3-k);
-// Dont remove the below section, handy for viewing the grid
-//            glVertex2f(v0x, v0y);
-//            glVertex2f(v1x, v1y);
-//            glVertex2f(v2x, v2y);
-//            glVertex2f(v3x, v3y);
-//
-//            glVertex2f(v0x, v0y);
-//            glVertex2f(v3x, v3y);
-//            glVertex2f(v1x, v1y);
-//            glVertex2f(v2x, v2y);
 
             switch (dec) {
                 case 1 :
@@ -1120,27 +1110,14 @@ void Visualization::compute_isolines(float isoValue) {
                     break;
                 case 5 :
                 case 10:
-
-                    //srand(time(NULL));
-//                    if ((rand() % 10) >= 5) {
-//                        glVertex2f(intersection_point(v0x, v1x, r0, r1, isoValue),
-//                                   intersection_point(v0y, v1y, r0, r1, isoValue));
-//                        glVertex2f(intersection_point(v2x, v0x, r2, r0, isoValue),
-//                                   intersection_point(v2y, v0y, r2, r0, isoValue));
-//                        glVertex2f(intersection_point(v0x, v3x, r0, r3, isoValue),
-//                                   intersection_point(v0y, v3y, r0, r3, isoValue));
-//                        glVertex2f(intersection_point(v2x, v3x, r2, r3, isoValue),
-//                                   intersection_point(v2y, v3y, r2, r3, isoValue));
-//                    } else {
-                        glVertex2f(intersection_point(v2x, v1x, r2, r1, isoValue),
-                                   intersection_point(v2y, v1y, r2, r1, isoValue));
-                        glVertex2f(intersection_point(v2x, v3x, r2, r3, isoValue),
-                                   intersection_point(v2y, v3y, r2, r3, isoValue));
-                        glVertex2f(intersection_point(v0x, v1x, r0, r1, isoValue),
-                                   intersection_point(v0y, v1y, r0, r1, isoValue));
-                        glVertex2f(intersection_point(v0x, v3x, r0, r3, isoValue),
-                                   intersection_point(v0y, v3y, r0, r3, isoValue));
-//                    }
+                    glVertex2f(intersection_point(v2x, v1x, r2, r1, isoValue),
+                               intersection_point(v2y, v1y, r2, r1, isoValue));
+                    glVertex2f(intersection_point(v2x, v3x, r2, r3, isoValue),
+                               intersection_point(v2y, v3y, r2, r3, isoValue));
+                    glVertex2f(intersection_point(v0x, v1x, r0, r1, isoValue),
+                               intersection_point(v0y, v1y, r0, r1, isoValue));
+                    glVertex2f(intersection_point(v0x, v3x, r0, r3, isoValue),
+                               intersection_point(v0y, v3y, r0, r3, isoValue));
                     break;
                 case 6 :
                 case 9 :

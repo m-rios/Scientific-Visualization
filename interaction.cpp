@@ -57,6 +57,8 @@ GLfloat light_position[4] = { ((GLfloat)vis->gridWidth)/2.0f, ((GLfloat)vis->gri
 
 int seed_x, seed_y, seed_z;
 
+float visc = sim->visc, dt = sim->dt;
+
 
 using namespace std;
 
@@ -109,7 +111,8 @@ void divergence_cb( int control )
     if (vis->display_divergence)
     {
         clamp_min_spinner->set_int_limits(-1, 0);
-        clamp_min_spinner->set_int_val(-1);
+        clamp_min_spinner->set_float_val(-0.1);
+        clamp_max_spinner->set_float_val(0.1);
 
     }
     else
@@ -123,8 +126,6 @@ void enable_3d_view( int control )
 {
     if (vis->height_plot || vis->stream_tubes)
     {
-        glEnable(GL_DEPTH_TEST);
-
         eye[0] = -200;
         eye[1] = -200;
         eye[2] = 500;
@@ -154,6 +155,10 @@ void display(void)
     {
         vis->draw_3d_grid();
         gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
+        glEnable(GL_DEPTH_TEST);
+    } else
+    {
+        glDisable(GL_DEPTH_TEST);
     }
 
 //    glEnable(GL_LIGHTING);
@@ -237,24 +242,6 @@ void mouseCallback(int button, int state, int x, int y)
         right_button = state;
     else if (button == GLUT_MIDDLE_BUTTON)
         middle_button = state;
-
-//    if (vis->stream_tubes && left_button == GLUT_DOWN) //place seed
-//    {
-//        GLdouble clipX = (x/vis->gridWidth)*2.0-1.0;
-//        GLdouble clipY = (y/vis->gridHeight)*2.0; // the Y is usually upside down
-//        GLdouble z;
-//        glReadPixels (clipX, clipY, 1, 1, GL_DEPTH_COMPONENT, GL_DOUBLE, &z);
-//        GLdouble m[16];
-//        glGetDoublev(GL_MODELVIEW_MATRIX, m);
-//        GLdouble p[16];
-//        glGetDoublev(GL_PROJECTION_MATRIX, p);
-//        GLint viewport[4];
-//        glGetIntegerv(GL_VIEWPORT, viewport);
-//        GLdouble X, Y, Z;
-//        gluUnProject(clipX, clipY, 0, m, p, viewport, &X, &Y, &Z);
-////        vis->add_seed(X, Y, Z);
-//        vis->add_seed(x, y, 0);
-//    }
 
     last_mx = x;
     last_my = y;
@@ -395,6 +382,7 @@ void do_one_simulation_step()
         if ( glutGetWindow() != main_window) glutSetWindow(main_window);
         vis->do_one_simulation_step();
     }
+    glui->sync_live();
 }
 
 static void TimeEvent(int te)
@@ -443,6 +431,14 @@ void heigh_cb(int control)
     vis->dn = vis->hp_height / vis->volume_instances;
 }
 
+void set_sim_parameters_cb(int control)
+{
+    if (control)
+        sim->visc = visc;
+    else
+        sim->dt = (double) dt;
+}
+
 //main: The main program
 int main(int argc, char **argv)
 {
@@ -481,6 +477,10 @@ int main(int argc, char **argv)
     glutTimerFunc( 10, TimeEvent, 1);
     glui = GLUI_Master.create_glui("Control Panel");
 
+
+    GLUI_Panel *simulation_panel = new GLUI_Panel(glui, "Simulation panel");
+    glui->add_spinner_to_panel(simulation_panel, "Time step", GLUI_SPINNER_FLOAT ,&dt , 0, set_sim_parameters_cb)->set_float_limits(0.001, 1);
+    glui->add_spinner_to_panel(simulation_panel, "Viscosity", GLUI_SPINNER_FLOAT ,&visc, 1, set_sim_parameters_cb)->set_float_limits(0.001, 0.1);
 
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
     colormap_radio = new GLUI_RadioGroup(colormap_panel, (&vis->scalar_col), RADIO_COLOR_MAP, radio_cb);
@@ -553,6 +553,7 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( hp_dataset_radio, "Force" );
     height_spinner = glui->add_spinner_to_panel(height_plot_panel, "Height", GLUI_SPINNER_INT, &vis->hp_height, 0, heigh_cb);
     height_spinner->set_int_limits(50, 300);
+    glui->add_checkbox_to_panel(height_plot_panel, "Draw normals", &vis->draw_normals);
 
     GLUI_Panel *stream_tubes_panel = new GLUI_Panel(glui, "Stream tubes options");
     glui->add_checkbox_to_panel(stream_tubes_panel, "Enable stream tubes", &vis->stream_tubes, -1, enable_3d_view); //At some point this, height plots and basic have to be changed to radius group

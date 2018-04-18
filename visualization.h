@@ -83,15 +83,15 @@ public:
     int volume_instances = 50; //Number of time instances to store in the volume
     GLdouble dt = 20; //Integration step for streamtubes
     int max_t = 100; //Max integration time for streamtubes
+    int draw_normals = 0;
 
-    GLfloat light_ambient[4] = { 1, 1, 1, 1.0 };
+    GLfloat light_ambient[4] = { 0.1, 0.1, 0.1, 1.0 };
     GLfloat light_diffuse[4] = { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
-    GLfloat light_position[4] = { ((GLfloat)gridWidth)/2.0f, ((GLfloat)gridHeight)/2.0f, (GLfloat) hp_height+50.0f, 1.0 };
+    GLfloat light_position[4] = { (GLfloat) -100, (GLfloat) -100, (GLfloat) hp_height+50.0f, 1.0 };
 
     GLfloat specularMaterial[3] = {1.0, 1.0, 1.0};
     GLfloat diffuseMaterial[3] = {0.9, 0.0, 0.0};
-    GLfloat mShininess = 128;
 
     Visualization();
     void rainbow(float value,float* R,float* G,float* B);
