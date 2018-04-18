@@ -783,28 +783,51 @@ void Visualization::light()
 
 }
 
-int Visualization::nearestNeighbour(double samplex,double sampley,double gridx1,double gridx2,double gridy1,double gridy2){
+void Visualization::interpolate_2d_point(GLdouble x, GLdouble y, fftw_real &vx, fftw_real &vy, fftw_real* x_dataset, fftw_real* y_dataset, int &id)
+{
+    int i, j, k;
 
-    //root((x2-x1)^2 + (y2 - y1)^2)
+    i = (int) ((x-wn) / wn);
+    j = (int) ((y-hn) / hn);
 
-    float e1 = sqrtf(((samplex*samplex) - (gridx1*gridx1)) + ((sampley * sampley) - (gridy1*gridy1)));
-    float e2 = sqrtf(((samplex*samplex) - (gridx1*gridx1)) + ((sampley * sampley) - (gridy2*gridy2)));
-    float e3 = sqrtf(((samplex*samplex) - (gridx2*gridx2)) + ((sampley * sampley) - (gridy2*gridy2)));
-    float e4 = sqrtf(((samplex*samplex) - (gridx2*gridx2)) + ((sampley * sampley) - (gridy1*gridy1)));
-    if (e1 > e2 && e1 > e3 && e1 > e4) {
-     return 0;
-    }
-    if (e2 > e1 && e2 > e3 && e2 > e4) {
-        return 1;
-    }
+    //Transform coordinates to unit grid
+    double r = (x - i*wn)/wn;
+    double s = (y - j*hn)/hn;
 
-    if (e3 > e1 && e3 > e2 && e3 > e4) {
-        return 2;
-    }
-    if (e4 > e1 && e4 > e2 && e4 > e3) {
-        return 3;
-    }
+    int idx0 = (j * sim->DIM) + i;
+    int idx1 = ((j + 1) * sim->DIM) + i;
+    int idx2 = ((j + 1) * sim->DIM) + (i + 1);
+    int idx3 = (j * sim->DIM) + (i + 1);
+
+    if (r < 0.5 && s < 0.5)
+        id = idx0;
+    else if (r < 0.5 && s >= 0.5)
+        id = idx1;
+    else if (r >= 0.5 && s >= 0.5)
+        id = idx2;
+    else
+        id = idx3;
+
+    //Compute basis functions
+    double b1 = (1-r)*(1-s);
+    double b2 = r*(1-s);
+    double b3 = r*s;
+    double b4 = (1-r)*s;
+
+    //Get values of the hexahedron vertices
+    double x1 = x_dataset[j*sim->DIM+i];       double y1 = y_dataset[j*sim->DIM+i];
+    double x2 = x_dataset[j*sim->DIM+i+1];     double y2 = y_dataset[j*sim->DIM+i+1];
+    double x3 = x_dataset[(j+1)*sim->DIM+i+1]; double y3 = y_dataset[(j+1)*sim->DIM+i+1];
+    double x4 = x_dataset[(j+1)*sim->DIM+i];   double y4 = y_dataset[(j+1)*sim->DIM+i];
+
+    //Interpolate
+    vx = b1*x1 + b2*x2 + b3*x3 + b4*x4;
+    vy = b1*y1 + b2*y2 + b3*y3 + b4*y4;
+    if (std::isnan(vx) || std::isnan(vy))
+        printf("Oops\n");
+
 }
+
 
 //visualize: This is the main visualization function
 void Visualization::visualize(void) {
@@ -877,6 +900,7 @@ void Visualization::visualize(void) {
                 glEnd();
             } else if (typeGlyph == 1) //Conical glyph section
             {
+                double grid [4]= {};
                 fftw_real winX = (fftw_real) gridWidth / (fftw_real) (glyph_x + 1);
                 fftw_real winY = (fftw_real) gridHeight / (fftw_real) (glyph_y + 1);
                 for (j = 0; j < glyph_y; j++) {
@@ -884,45 +908,70 @@ void Visualization::visualize(void) {
                         //Get sample point coordinates
                         double samplex = winX + (fftw_real) i * winX;
                         double sampley = winY + (fftw_real) j * winY;
-                        //Get grid coordinates
-                        double gridx1 = wn + (fftw_real) i * wn;
-                        double gridy1 = hn + (fftw_real) j * hn;
-                        double gridx2 = wn + (fftw_real)(i + 1) * wn;
-                        double gridy2 = hn + (fftw_real)(j + 1) * hn;
-                        //interpolate the values of the grid with the coordinates.
-                        int idx0 = (j * sim->DIM) + i;
-                        int idx1 = ((j + 1) * sim->DIM) + i;
-                        int idx2 = ((j + 1) * sim->DIM) + (i + 1);
-                        int idx3 = (j * sim->DIM) + (i + 1);
+
+
+//                        int indi = (int) ((samplex - wn)/wn);
+//                        int indj = (int) ((sampley - hn)/hn);
+//
+//                        int px0 = wn + indi*wn;
+//                        int py0 = wn + indj*wn;
+//
+//                        int px1 = wn + indi*wn;
+//                        int py1 = wn + (indj+1)*wn;
+//                        int px2 = wn + (indi+1)*wn;
+//                        int py2 = wn + (indj+1)*wn;
+//                        int px3 = wn + (indi+1)*wn;
+//                        int py3 = wn + indj*wn;
+
+
+//                        int idx0 = (indj * sim->DIM) + indi;
+//                        int idx1 = ((indj + 1) * sim->DIM) + indi;
+//                        int idx2 = ((indj + 1) * sim->DIM) + (indi + 1);
+//                        int idx3 = (indj * sim->DIM) + (indi + 1);
+//
+//                        //Get grid coordinates
+//                        for (int i = 0; i < sim->DIM; i++) {
+//                            for (int j = 0; j < sim->DIM; j++) {
+//                                double gridx1 = wn + (fftw_real) i * wn;
+//                                double gridy1 = hn + (fftw_real) j * hn;
+//                                double gridx2 = wn + (fftw_real)(i + 1) * wn;
+//                                double gridy2 = hn + (fftw_real)(j + 1) * hn;
+//                                if (((samplex > gridx1) && (samplex < gridx2)) || ((sampley > gridy1) && (sampley < gridy2))){
+//                                    grid[0] = gridx1;
+//                                    grid[1] = gridx2;
+//                                    grid[2] = gridy1;
+//                                    grid[3] = gridy2;
+//                                }
+//                            }
+//                        }
+
 
                         if (vGlyph == 0)//fluid velocity
                         {
-//                            double R1 = ((gridx2 - samplex)/(gridx2 - gridx1))*sim->vx[idx0] + ((samplex - gridx1)/(gridx2 - gridx1))*sim->vx[idx2];
-//
-//                        double R2 = ((gridx2 - samplex)/(gridx2 - gridx1))*sim->vy[idx1] + ((samplex - gridx1)/(gridx2 - gridx1))*sim->vy[idx3];
-//
-//                        double P = ((gridy2 - sampley)/(gridy2 - gridy1))*R1 + ((sampley - gridy1)/(gridy2 - gridy1))*R2;
-
-                            int index = nearestNeighbour(samplex,sampley,gridx1,gridx2,gridy1,gridy2);
-                            if (index == 0) {index = idx0;}
-                            if (index == 1) {index = idx1;}
-                            if (index == 2) {index = idx2;}
-                            if (index == 3) {index = idx3;}
+                            int index;
+                            fftw_real vx, vy;
+                            interpolate_2d_point(samplex, sampley, vx, vy, sim->vx, sim->vy, index);
                             set_colormap(dataset[index]); //applying colourmapping
-                            double magV = sqrt(pow(sim->vx[index], 2) + pow(sim->vy[index], 2));
-                            double angleV = atan2(sim->vy[index], sim->vx[index]);
+
+                            double magV = sqrt(pow(vx, 2) + pow(vy, 2));
+                            double angleV = atan2(vy, vx);
                             double deg = angleV * (180 / 3.1415927);
                             glTranslatef(i * winX, j * winY, 0.0);
                             glRotatef(90, 0.0, 1.0, 0.0);
                             glRotatef(-deg, 1.0, 0.0, 0.0);
                             glutSolidCone(5.0, magV * 500, 20, 20);
                             glLoadIdentity();
+
                         } else if (vGlyph == 1) // force
                         {
-                            double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
-                            double angleF = atan2(sim->fy[idx], sim->fx[idx]);
+                            int index;
+                            fftw_real fx, fy;
+                            interpolate_2d_point(samplex, sampley, fx, fy, sim->fx, sim->fy, index);
+                            set_colormap(dataset[index]); //applying colourmapping
+                            double magF = sqrt(pow(fx, 2) + pow(fy, 2));
+                            double angleF = atan2(fy, fx);
                             double deg = angleF * (180 / 3.1415927);
-                            glTranslatef(i * wn, j * hn, 0.0);
+                            glTranslatef(i * winX, j * winY, 0.0);
                             glRotatef(90, 0.0, 1.0, 0.0);
                             glRotatef(-deg, 1.0, 0.0, 0.0);
                             glutSolidCone(5.0, magF * 500, 20, 20);
@@ -946,6 +995,11 @@ void Visualization::visualize(void) {
                     glRotatef(90, 0.0, 1.0, 0.0);
                     glRotatef(-deg, 1.0, 0.0, 0.0);
                     glutSolidCone(5.0, magV * 500, 20, 20);
+                    glBegin(GL_LINES);
+                    glVertex2f(winX + (fftw_real) i * winX, winY + (fftw_real) j * winY);
+                    glVertex2f((winX + (fftw_real) i * winX) + vec_scale * cos(angleV) * magV,
+                               (winY + (fftw_real) j * winY) + vec_scale * sin(angleV) * magV);
+                    glEnd();
                     glLoadIdentity();
                 } else if (vGlyph == 1) // force
                 {

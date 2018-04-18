@@ -479,7 +479,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
+    glui = GLUI_Master.create_glui("controlpanel");
 
 
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );

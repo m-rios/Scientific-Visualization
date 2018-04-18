@@ -115,9 +115,8 @@ public:
     void draw_tubes();
     void light();
     void set_normal(int i, int j, float value, fftw_real *dataset);
-    void interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fftw_real &vx, fftw_real &vy);
+    void interpolate_2d_point(GLdouble x, GLdouble y, fftw_real &vx, fftw_real &vy, fftw_real* x_dataset, fftw_real* y_dataset, int &id);    void interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fftw_real &vx, fftw_real &vy);
     void compute_isolines(float isoValue);
     float intersection_point(float pi,float pj,float vi, float vj, float isoValue);
-    int nearestNeighbour(double samplex,double sampley,double gridx1,double gridx2,double gridy1,double gridy2);
 };
 #endif //SCIENTIFIC_VISUALIZATION_VISUALIZATION_H
