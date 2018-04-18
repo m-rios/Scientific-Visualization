@@ -508,8 +508,8 @@ int main(int argc, char **argv)
 
     GLUI_Panel *glyphtype_panel = new GLUI_Panel( glui, "choose the type of vis->glyph" );
     glyphtype = new GLUI_RadioGroup(glyphtype_panel , (&vis->typeGlyph), 6, glyphtype_cb);
-    sampling_x = glui->add_spinner_to_panel(glyphtype_panel, "Glyphs in x-axis", GLUI_SPINNER_INT, &vis->glyph_x, sim->DIM, glyphsampling_cb);
-    sampling_y = glui->add_spinner_to_panel(glyphtype_panel, "Glyphs in y-axis", GLUI_SPINNER_INT, &vis->glyph_y, sim->DIM, glyphsampling_cb );
+    sampling_x = glui->add_spinner_to_panel(glyphtype_panel, "Glyphs in x-axis", GLUI_SPINNER_INT, &vis->glyph_x);
+    sampling_y = glui->add_spinner_to_panel(glyphtype_panel, "Glyphs in y-axis", GLUI_SPINNER_INT, &vis->glyph_y);
     sampling_x->set_int_limits(10,sim->DIM);
     sampling_y->set_int_limits(10,sim->DIM);
     new GLUI_RadioButton( glyphtype, "default" );

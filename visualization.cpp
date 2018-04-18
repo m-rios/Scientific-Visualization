@@ -840,8 +840,6 @@ void Visualization::interpolate_2d_point(GLdouble x, GLdouble y, fftw_real &vx, 
     //Interpolate vector field
     vx = b1*x1 + b2*x2 + b3*x3 + b4*x4;
     vy = b1*y1 + b2*y2 + b3*y3 + b4*y4;
-    if (std::isnan(vx) || std::isnan(vy))
-        printf("Oops\n");
 
     //Interpolate scalar field for colour
     fftw_real val = b1*scalar_dataset[idx0] + b2*scalar_dataset[idx1] + b3*scalar_dataset[idx2] + b4*scalar_dataset[idx3];
