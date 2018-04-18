@@ -648,7 +648,7 @@ void Visualization::interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fft
     //Interpolate
     vx = b1*x1 + b2*x2 + b3*x3 + b4*x4 + b5*x5 + b6*x6 + b7*x7 + b8*x8;
     vy = b1*y1 + b2*y2 + b3*y3 + b4*y4 + b5*y5 + b6*y6 + b7*y7 + b8*y8;
-    if (isnan(vx) || isnan(vy))
+    if (std::isnan(vx) || std::isnan(vy))
         printf("Oops\n");
 }
 
