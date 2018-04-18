@@ -621,16 +621,20 @@ void Visualization::draw_seeds()
 void Visualization::move_seed(GLdouble x, GLdouble y, GLdouble z)
 {
     if (seeds.size() > 0)
-        seeds.back() = {x, y, z};
+        seeds.back() = {wn + x, hn + y, z};
 }
 
 void Visualization::interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fftw_real &vx, fftw_real &vy)
 {
     int i, j, k;
 
-    i = (int) (x / wn);
-    j = (int) (y / hn);
+    i = (int) ((x-wn) / wn);
+    j = (int) ((y-hn) / hn);
     k = (int) (z / dn);
+
+    if (k >= volume_instances) k = volume_instances-1;
+
+    printf("i: %f, j: %f, k: %f\n", (float)i, (float)j, (float) k);
 
     //Transform coordinates to unit grid
     double r = (x - i*wn)/wn;
@@ -661,6 +665,8 @@ void Visualization::interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fft
     //Interpolate
     vx = b1*x1 + b2*x2 + b3*x3 + b4*x4 + b5*x5 + b6*x6 + b7*x7 + b8*x8;
     vy = b1*y1 + b2*y2 + b3*y3 + b4*y4 + b5*y5 + b6*y6 + b7*y7 + b8*y8;
+    if (std::isnan(vx) || std::isnan(vy))
+        printf("Oops\n");
 }
 
 void Visualization::draw_tubes()
@@ -679,7 +685,7 @@ void Visualization::draw_tubes()
             streamline.push_back({x, y, z});
 
             interpolate_3d_point(x, y, z, vx, vy);
-
+            printf("x: %f, vx: %f\n", x, vx);
             x = x + vx*dt;
             y = y + vy*dt;
             z = z + dt; //Must decide proper step for z
@@ -769,7 +775,7 @@ void Visualization::light()
 
     GLfloat whiteSpecularMaterial[] = {1.0, 1.0, 1.0};
     GLfloat diffuseMaterial[] = {0.9, 0.0, 0.0};
-    GLfloat mShininess = 128;
+    GLfloat mShininess = 0;
 
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, whiteSpecularMaterial);
     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuseMaterial);

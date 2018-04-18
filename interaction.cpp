@@ -518,6 +518,8 @@ int main(int argc, char **argv)
     new GLUI_RadioButton( glyphtype, "cones" );
     new GLUI_RadioButton( glyphtype, "arrows" );
 
+    glui->add_column();
+
     GLUI_Panel *clamping_panel = new GLUI_Panel( glui, "Clamping options" );
     glui->add_checkbox_to_panel(clamping_panel, "Apply clamping", &vis->apply_mode);
     clamp_max_spinner = glui->add_spinner_to_panel(clamping_panel, "Clamp max", GLUI_SPINNER_FLOAT, &vis->clamp_max);
