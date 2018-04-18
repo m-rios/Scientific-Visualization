@@ -156,7 +156,7 @@ void display(void)
         gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], 0, 0, 1);
     }
 
-    glEnable(GL_LIGHTING);
+//    glEnable(GL_LIGHTING);
     vis->visualize();
 
     glFlush();
@@ -176,11 +176,11 @@ void reshape(int w, int h)
     vis->wn = (fftw_real)vis->gridWidth  / (fftw_real)(sim->DIM + 1);
     vis->hn = (fftw_real)vis->gridHeight / (fftw_real)(sim->DIM + 1);
 
-    if (vis->height_plot)
+    if (vis->height_plot || vis->stream_tubes)
     {
         lookat[0] = vis->gridWidth/2.0f;
         lookat[1] = vis->gridHeight/2.0f;
-        GLfloat light_position[] = {lookat[0], lookat[1], 500.0, 1.0};
+        GLfloat light_position[] = {0.0, (GLfloat) vis->gridHeight, 300.0, 1.0};
         glLightfv(GL_LIGHT0, GL_POSITION, light_position );
     }
 
@@ -479,7 +479,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
+    glui = GLUI_Master.create_glui("Control Panel");
 
 
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
@@ -494,8 +494,6 @@ int main(int argc, char **argv)
     (min_sat_spinner = glui->add_spinner_to_panel(colormap_panel, "Min sat", GLUI_SPINNER_FLOAT, &vis->min_sat, 3, update_custom_hue))->set_float_limits(0,1);
 
     min_hue_spinner->disable(); min_sat_spinner->disable(); max_hue_spinner->disable(); max_sat_spinner->disable();
-
-
 
     GLUI_Panel *dataset_panel = new GLUI_Panel( glui, "Dataset to be Mapped" );
     dataset_radio = new GLUI_RadioGroup(dataset_panel, (&vis->display_dataset), RADIO_DATASET, radio_cb);

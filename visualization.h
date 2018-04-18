@@ -89,6 +89,10 @@ public:
     GLfloat light_specular[4] = { 1.0, 1.0, 1.0, 1.0 };
     GLfloat light_position[4] = { ((GLfloat)gridWidth)/2.0f, ((GLfloat)gridHeight)/2.0f, (GLfloat) hp_height+50.0f, 1.0 };
 
+    GLfloat specularMaterial[3] = {1.0, 1.0, 1.0};
+    GLfloat diffuseMaterial[3] = {0.9, 0.0, 0.0};
+    GLfloat mShininess = 128;
+
     Visualization();
     void rainbow(float value,float* R,float* G,float* B);
     void heatmap(float value, float* R, float* G, float* B);
