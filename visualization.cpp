@@ -48,15 +48,15 @@ void Visualization::remove_seed()
 //rainbow: Implements a color palette, mapping the scalar 'value' to a rainbow color RGB
 void Visualization::rainbow(float value,float* R,float* G,float* B)
 {
-	const float dx=0.8;
-	if (value<0)
-		value=0;
-	if (value>1)
-		value=1;
-	value = (6-2*dx)*value+dx;
-	*R = sim->max(0.0,(3-fabs(value-4)-fabs(value-5))/2);
-	*G = sim->max(0.0,(4-fabs(value-2)-fabs(value-4))/2);
-	*B = sim->max(0.0,(3-fabs(value-1)-fabs(value-2))/2);
+    const float dx=0.8;
+    if (value<0)
+        value=0;
+    if (value>1)
+        value=1;
+    value = (6-2*dx)*value+dx;
+    *R = sim->max(0.0,(3-fabs(value-4)-fabs(value-5))/2);
+    *G = sim->max(0.0,(4-fabs(value-2)-fabs(value-4))/2);
+    *B = sim->max(0.0,(3-fabs(value-1)-fabs(value-2))/2);
 }
 
 //heatmap: Implements a heatmap color palette (Black-Red-Yellow-White).
@@ -143,9 +143,26 @@ fftw_real Visualization::scale(fftw_real min, fftw_real max, fftw_real value)
 //set_colormap: Sets different types of colormaps
 void Visualization::set_colormap(float vy)
 {
-	float R,G,B;
-    get_colormap(vy, &R, &G, &B);
-	glColor3f(R,G,B);
+    float R,G,B;
+    vy = conform_to_bands(vy);
+    if (scalar_col==COLOR_BLACKWHITE)
+        R = G = B = vy;
+    else if (scalar_col==COLOR_RAINBOW)
+        rainbow(vy,&R,&G,&B);
+    else if (scalar_col==COLOR_HEATMAP)
+        heatmap(vy, &R, &G, &B);
+
+    if (typeGlyph != 1) {
+        glColor3f(R, G, B);
+    } else {
+        GLfloat color[] = {R,G,B};
+        glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE,color);
+        glMaterialfv(GL_FRONT, GL_SPECULAR, color);
+        glMaterialf(GL_FRONT, GL_SHININESS, 30);
+        glEnable(GL_LIGHTING);                // so the renderer considers light
+        glEnable(GL_LIGHT0);
+        glShadeModel(GL_SMOOTH); //Gouroud shading
+    }
 }
 
 void Visualization::get_colormap(float vy, float *R, float *G, float *B)
@@ -186,7 +203,6 @@ void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
     float step = (float) (winHeight - 2 *hn) / (float) n_colors;
 
     glEnable(GL_TEXTURE_1D);
-    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 
     for (int j = 0; j < n_colors; ++j)
     {
@@ -209,7 +225,7 @@ void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
     snprintf (string, sizeof(string), "%1.3f", min_v);
     draw_text(string, winWidth-legend_text_len, hn);
     snprintf (string, sizeof(string), "%1.3f", max_v);
-    draw_text(string, winWidth-legend_text_len, (sim->DIM)*hn-16);
+    draw_text(string, winWidth-legend_text_len, (sim->DIM-1)*hn);
 }
 
 
@@ -219,29 +235,29 @@ void Visualization::draw_legend(fftw_real min_v, fftw_real max_v)
 void Visualization::direction_to_color(float x, float y, int method)
 {
 
-	float r,g,b,f;
-	if (method)
-	{
-		f = atan2(y,x) / 3.1415927 + 1;
-		r = f;
-		if(r > 1)
-			r = 2 - r;
-		g = f + .66667;
-		if(g > 2)
-			g -= 2;
-		if(g > 1)
-			g = 2 - g;
-		b = f + 2 * .66667;
-		if(b > 2)
-			b -= 2;
-		if(b > 1)
-			b = 2 - b;
-	}
-	else
-	{
-		r = g = b = 1;
-	}
-	glColor3f(r,g,b);
+    float r,g,b,f;
+    if (method)
+    {
+        f = atan2(y,x) / 3.1415927 + 1;
+        r = f;
+        if(r > 1)
+            r = 2 - r;
+        g = f + .66667;
+        if(g > 2)
+            g -= 2;
+        if(g > 1)
+            g = 2 - g;
+        b = f + 2 * .66667;
+        if(b > 2)
+            b -= 2;
+        if(b > 1)
+            b = 2 - b;
+    }
+    else
+    {
+        r = g = b = 1;
+    }
+    glColor3f(r,g,b);
 }
 
 //find_min_max: return the min and max values in a dataset
@@ -262,12 +278,12 @@ void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *da
     for (int i = 0; i < sim->DIM - 1; i++)
     {
         for (int j = 0; j < sim->DIM - 1; j++)
-		{
+        {
             int next_x = (j * sim->DIM) + (i + 1); //next in x
             int next_y = ((j + 1) * sim->DIM) + i; //next cell in y
 
             int current = (j * sim->DIM) + i;
-			dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*1000;	//Divergence operator
+            dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*1000;	//Divergence operator
         }
     }
 }
@@ -286,27 +302,27 @@ void Visualization::prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_r
     }
     else if (display_dataset == DATASET_VELOCITY)
     {
-		if (display_divergence)
-		{
-			compute_divergence(sim->vx, sim->vy, dataset);
-		}
-		else
-		{
-			for (int i = 0; i < dim; ++i)
-				dataset[i] = sqrt(pow(sim->vx[i],2) + pow(sim->vy[i],2));
-		}
+        if (display_divergence)
+        {
+            compute_divergence(sim->vx, sim->vy, dataset);
+        }
+        else
+        {
+            for (int i = 0; i < dim; ++i)
+                dataset[i] = sqrt(pow(sim->vx[i],2) + pow(sim->vy[i],2));
+        }
     }
     else if (display_dataset == DATASET_FORCE)
     {
-		if (display_divergence)
-		{
-			compute_divergence(sim->fx, sim->fy, dataset);
-		}
-		else
-		{
-			for (int i = 0; i < dim; ++i)
-				dataset[i] = sqrt(pow(sim->fx[i],2) + pow(sim->fy[i],2));
-		}
+        if (display_divergence)
+        {
+            compute_divergence(sim->fx, sim->fy, dataset);
+        }
+        else
+        {
+            for (int i = 0; i < dim; ++i)
+                dataset[i] = sqrt(pow(sim->fx[i],2) + pow(sim->fy[i],2));
+        }
     }
 
     //Apply transformation
@@ -537,11 +553,11 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
         apply_mode = old_apply_mode;
     }
 
-    int idx, idx0, idx1, idx2, idx3;
+    int idx0, idx1, idx2, idx3;
     double px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3;
     glBegin(GL_TRIANGLES);
     glEnable(GL_COLOR_MATERIAL);
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE); //Enable color to modify diffuse material
+    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); //Enable color to modify diffuse material
     for (int j = 0; j < sim->DIM - 1; j++)
     {
         for (int i = 0; i < sim->DIM - 1; i++)
@@ -573,6 +589,7 @@ void Visualization::draw_smoke_surface(fftw_real *dataset, fftw_real min_v, fftw
             v1 = dataset[idx1];
             v2 = dataset[idx2];
             v3 = dataset[idx3];
+
 
             glTexCoord1f(v0);    glNormal3f(0, 0, 1);glVertex3f(px0,py0, pz0);
             glTexCoord1f(v1);    glNormal3f(0, 0, 1);glVertex3f(px1,py1, pz1);
@@ -686,6 +703,62 @@ void Visualization::draw_tubes()
         }
     }
 }
+void Visualization::create_textures()                    //Create one 1D texture for each of the available colormaps.
+{                                                        //We will next use these textures to color map scalar data.
+
+    glGenTextures(3, textureID);                            //Generate 3 texture names, for the textures we will create
+    glPixelStorei(GL_UNPACK_ALIGNMENT,
+                  1);                //Make sure that OpenGL will understand our CPU-side texture storage format
+
+    int selected_map = scalar_col;
+
+    for (int i = COLOR_BLACKWHITE;
+         i <= COLOR_CUSTOM; ++i) {                                                    //Generate all three textures:
+        glBindTexture(GL_TEXTURE_1D, textureID[i]);        //Make i-th texture active (for setting it)
+        const int size = 512;                            //Allocate a texture-buffer large enough to store our colormaps with high resolution
+        float textureImage[3 * size];
+
+        scalar_col = i;                //Activate the i-th colormap
+
+        for (int j = 0;
+             j < size; ++j)                            //Generate all 'size' RGB texels for the current texture:
+        {
+            float v = float(j) / (size - 1);                //Compute a scalar value in [0,1]
+            float R, G, B;
+            get_colormap(v, &R, &G,
+                         &B);                        //Map this scalar value to a color, using the current colormap
+
+            textureImage[3 * j] = R;                    //Store the color for this scalar value in the texture
+            textureImage[3 * j + 1] = G;
+            textureImage[3 * j + 2] = B;
+        }
+        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB, size, 0, GL_RGB, GL_FLOAT, textureImage);
+        //The texture is ready - pass it to OpenGL
+    }
+
+    scalar_col = selected_map;                    //Reset the currently-active colormap to the default (first one)
+}
+
+void Visualization::do_one_simulation_step(void) {
+    sim->do_one_simulation_step();
+
+    size_t dim = sim->DIM * 2 * (sim->DIM / 2 + 1);
+
+    fftw_real *x = (fftw_real *) malloc(dim);
+    fftw_real *y = (fftw_real *) malloc(dim);
+
+    memcpy(x, sim->vx, dim);
+    memcpy(y, sim->vy, dim);
+
+    v_volume.push_front({x, y});
+    if (v_volume.size() > volume_instances) {
+        std::array<fftw_real *, 2> xy = v_volume.back();
+        v_volume.pop_back();
+        free(xy[0]);
+        free(xy[1]);
+    }
+    glutPostRedisplay();
+}
 
 void Visualization::light()
 {
@@ -704,138 +777,227 @@ void Visualization::light()
 
 }
 
+int Visualization::nearestNeighbour(double samplex,double sampley,double gridx1,double gridx2,double gridy1,double gridy2){
+
+    //root((x2-x1)^2 + (y2 - y1)^2)
+
+    float e1 = sqrtf(((samplex*samplex) - (gridx1*gridx1)) + ((sampley * sampley) - (gridy1*gridy1)));
+    float e2 = sqrtf(((samplex*samplex) - (gridx1*gridx1)) + ((sampley * sampley) - (gridy2*gridy2)));
+    float e3 = sqrtf(((samplex*samplex) - (gridx2*gridx2)) + ((sampley * sampley) - (gridy2*gridy2)));
+    float e4 = sqrtf(((samplex*samplex) - (gridx2*gridx2)) + ((sampley * sampley) - (gridy1*gridy1)));
+    if (e1 > e2 && e1 > e3 && e1 > e4) {
+     return 0;
+    }
+    if (e2 > e1 && e2 > e3 && e2 > e4) {
+        return 1;
+    }
+
+    if (e3 > e1 && e3 > e2 && e3 > e4) {
+        return 2;
+    }
+    if (e4 > e1 && e4 > e2 && e4 > e3) {
+        return 3;
+    }
+}
+
 //visualize: This is the main visualization function
-void Visualization::visualize(void)
-{
-	int        i, j, idx;
+void Visualization::visualize(void) {
+    int i, j, idx;
 
     fftw_real min_v, max_v;
-    size_t dim = sim->DIM * 2*(sim->DIM/2+1);
-    fftw_real* dataset = (fftw_real*) calloc(dim, sizeof(fftw_real));
+    size_t dim = sim->DIM * 2 * (sim->DIM / 2 + 1);
+    fftw_real *dataset = (fftw_real *) calloc(dim, sizeof(fftw_real));
     prepare_dataset(dataset, &min_v, &max_v); //scale, clamp or compute magnitude for the required dataset
 
-    light_position[0] = ((GLfloat)gridWidth)/2.0f;
-    light_position[1] = ((GLfloat)gridHeight)/2.0f;
+    light_position[0] = ((GLfloat) gridWidth) / 2.0f;
+    light_position[1] = ((GLfloat) gridHeight) / 2.0f;
 
     glDisable(GL_LIGHTING);
 
-    if (height_plot)
-    {
+    if (height_plot) {
         draw_3d_grid();
         glEnable(GL_LIGHTING);
     }
 
-	if (draw_smoke)
-    {
+    if (draw_smoke) {
         light();
         draw_smoke_surface(dataset, min_v, max_v);
-    }
-
-    if (stream_tubes)
-    {
-        glEnable(GL_LIGHTING);
-        draw_seeds();
-
-        draw_tubes();
-
-        glTranslated(gridWidth/2.0f-100, gridHeight/2.0f-100, 50);
-        GLUquadricObj* pQuadric = gluNewQuadric();
-        gluSphere(pQuadric, 50, 32, 8);
-        glTranslated(-gridWidth/2.0f, -gridHeight/2.0f, -50); //For some reason glLoadIdentity doesn't work here
-    }
-
-    compute_isolines();
-
-
-	if (draw_vecs)
-	{
-		if (typeGlyph == 0 ) {
-			glBegin(GL_LINES);                //draw velocities
-
-			for (i = 0; i < sim->DIM; i++) {
-				for (j = 0; j < sim->DIM; j++) {
-					idx = (j * sim->DIM) + i;
-					direction_to_color(sim->vx[idx], sim->vy[idx], color_dir);
-					//mapping the scalar value of the dataset with color.
-					if (glyph ) {//User selects glyphs options
-						set_colormap(dataset[idx]);
-						if (vGlyph == 0)//fluid velocity
-						{
-							//(3.1415927 / 180.0) * angle;
-							double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));
-							double angleV = atan2(sim->vx[idx], sim->vy[idx]);
-							glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
-							glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
-									   (hn + (fftw_real) j * hn) + vec_scale * sin(angleV) * magV);
-						}
-
-						if (vGlyph == 1)//force
-						{
-							double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
-							double angleF = atan2(sim->fx[idx], sim->fy[idx]);
-							glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
-							glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
-									   (hn + (fftw_real) j * hn) + 500 * sin(angleF) * magF);
-						}
-					} else {
-						glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
-						glVertex2f((wn + (fftw_real) i * wn) + vec_scale * sim->vx[idx],
-								   (hn + (fftw_real) j * hn) + vec_scale * sim->vy[idx]);
-					}
-				}
-			}
-			glEnd();
+        if (draw_iLines) {
+            if (isoNumber > 1) {
+                float n = (upperLimit - lowerLimit) / isoNumber;
+                for (float i = lowerLimit; i <= upperLimit; i += n) {
+                    compute_isolines(i);
+                }
+            } else {
+                               compute_isolines(isoValue);
+            }
         }
-        else if (typeGlyph == 1) //Conical glyph section
-        {
-            for (j = 0; j < sim->DIM; j++) {
-                for (i = 0; i < sim->DIM ; i++) {
-                    idx = (j * sim->DIM) + i;
-                    set_colormap(dataset[idx]); //applying colourmapping
-                    if (vGlyph == 0)//fluid velocity
-                    {
-                        double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));
-                        double angleV = atan2(sim->vx[idx], sim->vy[idx]);
-                        double deg = angleV *(180/3.1415927);
-                        glTranslatef(i*wn, j*hn, -5.0);
-                        //todo:rotation based on the direction
-                        glRotatef(90,  0.0, 1.0, 0.0);
-                        glRotatef(-deg, 1.0, 0.0, 0.0);
-                        //glutSolidCone( GLdouble base, GLdouble height, GLint slices, GLint stacks );
-                        glutSolidCone(10.0, magV * 150, 20, 20);
-                        glLoadIdentity();
-                    } else if (vGlyph == 1) // force
-                    {
-                        double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
-                        double angleF = atan2(sim->fx[idx], sim->fy[idx]);
-                        double deg = angleF *(180/3.1415927);
-                        glutSolidCone(magF * 200, magF * 200, 20, 20);
-                        glTranslatef(0.0,hn, 0.0);
+        if (draw_vecs) {
+            if (typeGlyph == 0) {
+                glBegin(GL_LINES);                //draw velocities
+
+                for (i = 0; i < sim->DIM; i++) {
+                    for (j = 0; j < sim->DIM; j++) {
+                        idx = (j * sim->DIM) + i;
+                        direction_to_color(sim->vx[idx], sim->vy[idx], color_dir);
+                        //mapping the scalar value of the dataset with color.
+                        if (glyph) {//User selects glyphs options
+                            set_colormap(dataset[idx]);
+                            if (vGlyph == 0)//fluid velocity
+                            {
+                                //(3.1415927 / 180.0) * angle;
+                                double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));
+                                double angleV = atan2(sim->vx[idx], sim->vy[idx]);
+                                glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
+                                glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
+                                           (hn + (fftw_real) j * hn) + vec_scale * sin(angleV) * magV);
+                            }
+
+                            if (vGlyph == 1)//force
+                            {
+                                double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
+                                double angleF = atan2(sim->fx[idx], sim->fy[idx]);
+                                glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
+                                glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
+                                           (hn + (fftw_real) j * hn) + 500 * sin(angleF) * magF);
+                            }
+                        } else {
+                            glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
+                            glVertex2f((wn + (fftw_real) i * wn) + vec_scale * sim->vx[idx],
+                                       (hn + (fftw_real) j * hn) + vec_scale * sim->vy[idx]);
+                        }
                     }
                 }
-            }
-        } else {                  //Arrow glyph section
+                glEnd();
+            } else if (typeGlyph == 1) //Conical glyph section
+            {
+                fftw_real winX = (fftw_real) gridWidth / (fftw_real) (glyph_x + 1);
+                fftw_real winY = (fftw_real) gridHeight / (fftw_real) (glyph_y + 1);
+                for (j = 0; j < glyph_y; j++) {
+                    for (i = 0; i < glyph_x; i++) {
+                        //Get sample point coordinates
+                        double samplex = winX + (fftw_real) i * winX;
+                        double sampley = winY + (fftw_real) j * winY;
+                        //Get grid coordinates
+                        double gridx1 = wn + (fftw_real) i * wn;
+                        double gridy1 = hn + (fftw_real) j * hn;
+                        double gridx2 = wn + (fftw_real)(i + 1) * wn;
+                        double gridy2 = hn + (fftw_real)(j + 1) * hn;
+                        //interpolate the values of the grid with the coordinates.
+                        int idx0 = (j * sim->DIM) + i;
+                        int idx1 = ((j + 1) * sim->DIM) + i;
+                        int idx2 = ((j + 1) * sim->DIM) + (i + 1);
+                        int idx3 = (j * sim->DIM) + (i + 1);
 
+                        if (vGlyph == 0)//fluid velocity
+                        {
+//                            double R1 = ((gridx2 - samplex)/(gridx2 - gridx1))*sim->vx[idx0] + ((samplex - gridx1)/(gridx2 - gridx1))*sim->vx[idx2];
+//
+//                        double R2 = ((gridx2 - samplex)/(gridx2 - gridx1))*sim->vy[idx1] + ((samplex - gridx1)/(gridx2 - gridx1))*sim->vy[idx3];
+//
+//                        double P = ((gridy2 - sampley)/(gridy2 - gridy1))*R1 + ((sampley - gridy1)/(gridy2 - gridy1))*R2;
+
+                            int index = nearestNeighbour(samplex,sampley,gridx1,gridx2,gridy1,gridy2);
+                            if (index == 0) {index = idx0;}
+                            if (index == 1) {index = idx1;}
+                            if (index == 2) {index = idx2;}
+                            if (index == 3) {index = idx3;}
+                            set_colormap(dataset[index]); //applying colourmapping
+                            double magV = sqrt(pow(sim->vx[index], 2) + pow(sim->vy[index], 2));
+                            double angleV = atan2(sim->vy[index], sim->vx[index]);
+                            double deg = angleV * (180 / 3.1415927);
+                            glTranslatef(i * winX, j * winY, 0.0);
+                            glRotatef(90, 0.0, 1.0, 0.0);
+                            glRotatef(-deg, 1.0, 0.0, 0.0);
+                            glutSolidCone(5.0, magV * 500, 20, 20);
+                            glLoadIdentity();
+                        } else if (vGlyph == 1) // force
+                        {
+                            double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
+                            double angleF = atan2(sim->fy[idx], sim->fx[idx]);
+                            double deg = angleF * (180 / 3.1415927);
+                            glTranslatef(i * wn, j * hn, 0.0);
+                            glRotatef(90, 0.0, 1.0, 0.0);
+                            glRotatef(-deg, 1.0, 0.0, 0.0);
+                            glutSolidCone(5.0, magF * 500, 20, 20);
+                            glLoadIdentity();
+                        }
+                    }
+                }
+            } else {                  //Arrow glyph section
+                fftw_real winX = (fftw_real) gridWidth / (fftw_real) (glyph_x + 1);
+                fftw_real winY = (fftw_real) gridHeight / (fftw_real) (glyph_y + 1);
+                for (i = 0; i < glyph_x; i++) {
+                    for (j = 0; j < glyph_y; j++) {
+                        idx = (j * glyph_y) + i;
+                        set_colormap(dataset[idx]); //applying colourmapping
+                if (vGlyph == 0)//fluid velocity
+                {
+                    double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));
+                    double angleV = atan2(sim->vy[idx], sim->vx[idx]);
+                    double deg = angleV * (180 / 3.1415927);
+                    glTranslatef(i * winX, j * winY, 0.0);
+                    glRotatef(90, 0.0, 1.0, 0.0);
+                    glRotatef(-deg, 1.0, 0.0, 0.0);
+                    glutSolidCone(5.0, magV * 500, 20, 20);
+                    glLoadIdentity();
+                } else if (vGlyph == 1) // force
+                {
+                    double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
+                    double angleF = atan2(sim->fy[idx], sim->fx[idx]);
+                    double deg = angleF * (180 / 3.1415927);
+                    glTranslatef(i * wn, j * hn, 0.0);
+                    glRotatef(90, 0.0, 1.0, 0.0);
+                    glRotatef(-deg, 1.0, 0.0, 0.0);
+                    glutSolidCone(5.0, magF * 500, 20, 20);
+                    glLoadIdentity();
+                }
+            }
         }
-	}
-//    glLoadIdentity();
-    draw_legend(min_v, max_v);
+            }
+        }
+        glLoadIdentity();
+        draw_legend(min_v, max_v);
+    }
 }
 
-void Visualization::compute_isolines()
-{
+
+    float Visualization::intersection_point(float pi, float pj, float vi, float vj, float isoValue) {
+        float q = 0.0;
+        if (pi < pj)    //Going in increasing direction of grid coordinates
+        {
+            if (vi > vj)
+                q = pj - (isoValue - vj) / (vi - vj) * (pj - pi);
+            else
+                q = (isoValue - vi) / (vj - vi) * (pj - pi) + pi;
+        } else {
+            if (vi > vj)
+                q = (isoValue - vj) / (vi - vj) * (pi - pj) + pj;
+            else
+                q = pi - (isoValue - vi) / (vj - vi) * (pi - pj);
+        }
+
+
+        printf("Q value %f between %f and %f:: \n", q, pi, pj);
+        return q;
+    }
+
+
+void Visualization::compute_isolines(float isoValue) {
     //This is to be implemented only for density
     //printf("Begin drawing ISOlines");
     //todo: Need to find out why the contour is patchy or how to fill the missing links.
     int dec = 0;
-    int        i, j;
-
+    int i, j;
 
     //Check the marching squares patterns and determine the sides to join.
     glBegin(GL_LINES);
-    glColor3f(0.0,0.0,0.0);
-    for (j = 0;j < sim->DIM-1; j++) {
-        for (i = 0; i < sim->DIM-1; i++) {
+//    glColor3f(0.0, 0.0, 0.0);
+//    glEnable(GL_LINE_SMOOTH);
+//    glLineWidth(3.0);
+    //set_colormap(isoValue);
+    for (j = 0; j < sim->DIM - 1; j++) {
+        for (i = 0; i < sim->DIM - 1; i++) {
 
             int v0x = wn + (fftw_real) i * wn;
             int v0y = hn + (fftw_real) j * hn;
@@ -871,74 +1033,87 @@ void Visualization::compute_isolines()
             if (r3 >= isoValue) code[3] = 1;
 
             //binary to decimal convertion
-            for (int k = 0; k < 4; k++)
+            for (int k = 0; k <= 3; k++)
                 dec = dec + code[k] * pow(2, 3-k);
 // Dont remove the below section, handy for viewing the grid
-            glVertex2f(v0x, v0y);
-            glVertex2f(v1x, v1y);
-            glVertex2f(v2x, v2y);
-            glVertex2f(v3x, v3y);
-
-            glVertex2f(v0x, v0y);
-            glVertex2f(v3x, v3y);
-            glVertex2f(v1x, v1y);
-            glVertex2f(v2x, v2y);
+//            glVertex2f(v0x, v0y);
+//            glVertex2f(v1x, v1y);
+//            glVertex2f(v2x, v2y);
+//            glVertex2f(v3x, v3y);
+//
+//            glVertex2f(v0x, v0y);
+//            glVertex2f(v3x, v3y);
+//            glVertex2f(v1x, v1y);
+//            glVertex2f(v2x, v2y);
 
             switch (dec) {
                 case 1 :
                 case 14:
 
-                    glVertex2f(intersection_point(v2x, v3x, r2, r3),
-                               intersection_point(v2y, v3y, r2, r3));
-                    glVertex2f(intersection_point(v0x, v3x, r0, r3),
-                               intersection_point(v0y, v3y, r0, r3));
+                    glVertex2f(intersection_point(v2x, v3x, r2, r3, isoValue),
+                               intersection_point(v2y, v3y, r2, r3, isoValue));
+                    glVertex2f(intersection_point(v0x, v3x, r0, r3, isoValue),
+                               intersection_point(v0y, v3y, r0, r3, isoValue));
                     break;
 
                 case 2 :
                 case 13:
-                    glVertex2f(intersection_point(v1x, v2x, r1, r2),
-                               intersection_point(v1y, v2y, r1, r2));
-                    glVertex2f(intersection_point(v3x, v2x, r3, r2),
-                               intersection_point(v3y, v2y, r3, r2));
+                    glVertex2f(intersection_point(v1x, v2x, r1, r2, isoValue),
+                               intersection_point(v1y, v2y, r1, r2, isoValue));
+                    glVertex2f(intersection_point(v3x, v2x, r3, r2, isoValue),
+                               intersection_point(v3y, v2y, r3, r2, isoValue));
                     break;
                 case 3 :
                 case 12:
-                    glVertex2f(intersection_point(v1x, v2x, r1, r2),
-                               intersection_point(v1y, v2y, r1, r2));
-                    glVertex2f(intersection_point(v0x, v3x, r0, r3),
-                               intersection_point(v0y, v3y, r0, r3));
+                    glVertex2f(intersection_point(v1x, v2x, r1, r2, isoValue),
+                               intersection_point(v1y, v2y, r1, r2, isoValue));
+                    glVertex2f(intersection_point(v0x, v3x, r0, r3, isoValue),
+                               intersection_point(v0y, v3y, r0, r3, isoValue));
                     break;
                 case 4 :
                 case 11:
-                    glVertex2f(intersection_point(v0x, v1x, r0, r1),
-                               intersection_point(v0y, v1y, r0, r1));
-                    glVertex2f(intersection_point(v2x, v1x, r2, r1),
-                               (intersection_point(v2y, v1y, r2, r1)));
+                    glVertex2f(intersection_point(v0x, v1x, r0, r1, isoValue),
+                               intersection_point(v0y, v1y, r0, r1, isoValue));
+                    glVertex2f(intersection_point(v2x, v1x, r2, r1, isoValue),
+                               (intersection_point(v2y, v1y, r2, r1, isoValue)));
                     break;
                 case 5 :
                 case 10:
-                    glVertex2f(intersection_point(v2x, v1x, r2, r1),
-                               intersection_point(v2y, v1y, r2, r1));
-                    glVertex2f(intersection_point(v2x, v3x, r2, r3),
-                               intersection_point(v2y, v3y, r2, r3));
-                    glVertex2f(intersection_point(v0x, v1x, r0, r1),
-                               intersection_point(v0y, v1y, r0, r1));
-                    glVertex2f(intersection_point(v0x, v3x, r0, r3),
-                               intersection_point(v0y, v3y, r0, r3));
+
+                    //srand(time(NULL));
+//                    if ((rand() % 10) >= 5) {
+//                        glVertex2f(intersection_point(v0x, v1x, r0, r1, isoValue),
+//                                   intersection_point(v0y, v1y, r0, r1, isoValue));
+//                        glVertex2f(intersection_point(v2x, v0x, r2, r0, isoValue),
+//                                   intersection_point(v2y, v0y, r2, r0, isoValue));
+//                        glVertex2f(intersection_point(v0x, v3x, r0, r3, isoValue),
+//                                   intersection_point(v0y, v3y, r0, r3, isoValue));
+//                        glVertex2f(intersection_point(v2x, v3x, r2, r3, isoValue),
+//                                   intersection_point(v2y, v3y, r2, r3, isoValue));
+//                    } else {
+                        glVertex2f(intersection_point(v2x, v1x, r2, r1, isoValue),
+                                   intersection_point(v2y, v1y, r2, r1, isoValue));
+                        glVertex2f(intersection_point(v2x, v3x, r2, r3, isoValue),
+                                   intersection_point(v2y, v3y, r2, r3, isoValue));
+                        glVertex2f(intersection_point(v0x, v1x, r0, r1, isoValue),
+                                   intersection_point(v0y, v1y, r0, r1, isoValue));
+                        glVertex2f(intersection_point(v0x, v3x, r0, r3, isoValue),
+                                   intersection_point(v0y, v3y, r0, r3, isoValue));
+//                    }
                     break;
                 case 6 :
                 case 9 :
-                    glVertex2f(intersection_point(v0x, v1x, r0, r1),
-                               intersection_point(v0y, v1y, r0, r1));
-                    glVertex2f(intersection_point(v3x, v2x, r3, r2),
-                               intersection_point(v3y, v2y, r3, r2));
+                    glVertex2f(intersection_point(v0x, v1x, r0, r1, isoValue),
+                               intersection_point(v0y, v1y, r0, r1, isoValue));
+                    glVertex2f(intersection_point(v3x, v2x, r3, r2, isoValue),
+                               intersection_point(v3y, v2y, r3, r2, isoValue));
                     break;
                 case 7 :
                 case 8 :
-                    glVertex2f(intersection_point(v1x, v0x, r1, r0),
-                               intersection_point(v1y, v0y, r1, r0));
-                    glVertex2f(intersection_point(v3x, v0x, r3, r0),
-                               intersection_point(v3y, v0y, r3, r0));
+                    glVertex2f(intersection_point(v1x, v0x, r1, r0, isoValue),
+                               intersection_point(v1y, v0y, r1, r0, isoValue));
+                    glVertex2f(intersection_point(v3x, v0x, r3, r0, isoValue),
+                               intersection_point(v3y, v0y, r3, r0, isoValue));
                     break;
                 default:
 
@@ -951,83 +1126,3 @@ void Visualization::compute_isolines()
     glEnd();
 }
 
-float Visualization::intersection_point(float pi,float pj,float vi, float vj)
-{
-
-    float q = 0.0;
-
-    if (pi < pj)    //Going in increasing direction of grid coordinates
-    {
-        if (vi > vj)
-            q = pj - (isoValue - vj)/(vi - vj)*(pj-pi);
-        else
-            q = (isoValue - vi)/(vj - vi)*(pj - pi) + pi;
-    }
-    else
-    {
-        if (vi > vj)
-            q = (isoValue - vj)/(vi - vj)*(pi - pj) + pj;
-        else
-            q = pi - (isoValue - vi)/(vj - vi)*(pi - pj);
-    }
-
-
-    printf("Q value %f between %f and %f:: \n",q,pi,pj);
-    return q;
-}
-
-void Visualization::create_textures()					//Create one 1D texture for each of the available colormaps.
-{														//We will next use these textures to color map scalar data.
-
-    glGenTextures(3,textureID);							//Generate 3 texture names, for the textures we will create
-    glPixelStorei(GL_UNPACK_ALIGNMENT,1);				//Make sure that OpenGL will understand our CPU-side texture storage format
-
-    int selected_map = scalar_col;
-
-    for(int i=COLOR_BLACKWHITE;i<=COLOR_CUSTOM;++i)
-    {													//Generate all three textures:
-        glBindTexture(GL_TEXTURE_1D,textureID[i]);		//Make i-th texture active (for setting it)
-        const int size = 512;							//Allocate a texture-buffer large enough to store our colormaps with high resolution
-        float textureImage[3*size];
-
-        scalar_col = i;				//Activate the i-th colormap
-
-        for(int j=0;j<size;++j)							//Generate all 'size' RGB texels for the current texture:
-        {
-            float v = float(j)/(size-1);				//Compute a scalar value in [0,1]
-            float R,G,B;
-            get_colormap(v, &R, &G, &B);						//Map this scalar value to a color, using the current colormap
-
-            textureImage[3*j]   = R;					//Store the color for this scalar value in the texture
-            textureImage[3*j+1] = G;
-            textureImage[3*j+2] = B;
-        }
-        glTexImage1D(GL_TEXTURE_1D,0,GL_RGB,size,0,GL_RGB,GL_FLOAT,textureImage);
-        //The texture is ready - pass it to OpenGL
-    }
-
-    scalar_col = selected_map;					//Reset the currently-active colormap to the default (first one)
-}
-
-void Visualization::do_one_simulation_step(void)
-{
-    sim->do_one_simulation_step();
-
-    size_t dim = sim->DIM * 2*(sim->DIM/2+1);
-
-    fftw_real *x = (fftw_real*) malloc(dim);
-    fftw_real *y = (fftw_real*) malloc(dim);
-
-    memcpy(x, sim->vx, dim);
-    memcpy(y, sim->vy, dim);
-
-    v_volume.push_front({x, y});
-    if (v_volume.size() > volume_instances)
-    {
-        std::array<fftw_real*,2> xy = v_volume.back();
-        v_volume.pop_back();
-        free(xy[0]);
-        free(xy[1]);
-    }
-    glutPostRedisplay();
-}

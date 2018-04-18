@@ -31,7 +31,7 @@ public:
     Simulation *sim;
     int   winWidth, winHeight;      //size of the graphics window, in pixels
     int   gridWidth, gridHeight;    //size of the simulation grid in pixels
-    fftw_real  wn, hn, dn;          //size of the grid cell in pixels
+    fftw_real wn, hn, dn;          //size of the grid cell in pixels
     int   color_dir = 0;            //use direction color-coding or not
     float vec_scale = 1000;			//scaling of hedgehogs
     int   draw_smoke = 1;           //draw the smoke or not
@@ -66,7 +66,14 @@ public:
     int vGlyph = 0;
     int sGlyph = 0;
     int typeGlyph = 0;
-    float isoValue = 0.50;          //Isovalue set by the user
+    float isoValue = 0.5;          //Isovalue set by the user
+    int isoNumber = 1;
+    float upperLimit = 2;
+    float lowerLimit = 1;
+    int draw_iLines = 0;
+    int draw_n_iLines = 0;
+    int glyph_x = 50;
+    int glyph_y = 50;
     int hp_height = 250;
     int hp_display_dataset = 0;
     int stream_tubes = 0;
@@ -109,7 +116,8 @@ public:
     void light();
     void set_normal(int i, int j, float value, fftw_real *dataset);
     void interpolate_3d_point(GLdouble x, GLdouble y, GLdouble z, fftw_real &vx, fftw_real &vy);
-    void compute_isolines();
-    float intersection_point(float pi,float pj,float vi, float vj);
+    void compute_isolines(float isoValue);
+    float intersection_point(float pi,float pj,float vi, float vj, float isoValue);
+    int nearestNeighbour(double samplex,double sampley,double gridx1,double gridx2,double gridy1,double gridy2);
 };
 #endif //SCIENTIFIC_VISUALIZATION_VISUALIZATION_H

@@ -17,6 +17,8 @@ GLUI_Button *button;
 int   main_window;
 GLUI *glui_v_subwindow;
 int segments = 0;
+GLUI_Spinner *sampling_x;
+GLUI_Spinner *sampling_y;
 GLUI_Spinner *clamp_max_spinner;
 GLUI_Spinner *clamp_min_spinner;
 GLUI_Spinner *height_spinner;
@@ -27,6 +29,10 @@ GLUI_Spinner *max_sat_spinner;
 GLUI_Spinner *seed_x_spinner;
 GLUI_Spinner *seed_y_spinner;
 GLUI_Spinner *seed_z_spinner;
+GLUI_Spinner *isovalue_Selector;
+GLUI_Spinner *isoline_number;
+GLUI_EditText *lower_range_selector;
+GLUI_EditText *upper_range_selector;
 GLUI *glui;
 const int RADIO_COLOR_MAP = 0;
 const int RADIO_DATASET = 1;
@@ -90,6 +96,12 @@ void glyph_button_cb(int control)
 void glyphtype_cb(int control)
 {
     vis->typeGlyph = glyphtype->get_int_val();
+}
+
+void glyphsampling_cb(int control)
+{
+    vis->glyph_x = control;
+    vis->glyph_y = control;
 }
 
 void divergence_cb( int control )
@@ -361,14 +373,14 @@ void drag(int mx, int my)
         glutSetWindow(glui->get_glut_window_id());
 
         if (middle_button == GLUT_DOWN)
-           zoom(my);
-       else
-       {
-           if (left_button == GLUT_DOWN)
-               add_matter(mx, my);
-           else if (right_button == GLUT_DOWN)
-               orbit_view(mx, my);
-       }
+            zoom(my);
+        else
+        {
+            if (left_button == GLUT_DOWN)
+                add_matter(mx, my);
+            else if (right_button == GLUT_DOWN)
+                orbit_view(mx, my);
+        }
     }
     else
     {
@@ -467,7 +479,7 @@ int main(int argc, char **argv)
     glutMouseFunc(mouseCallback);
     glutReshapeFunc(reshape);
     glutTimerFunc( 10, TimeEvent, 1);
-    glui = GLUI_Master.create_glui("Control Panel");
+    glui = GLUI_Master.create_glui_subwindow(main_window, GLUI_SUBWINDOW_RIGHT);
 
 
     GLUI_Panel *colormap_panel = new GLUI_Panel( glui, "Colour map type" );
@@ -498,6 +510,10 @@ int main(int argc, char **argv)
 
     GLUI_Panel *glyphtype_panel = new GLUI_Panel( glui, "choose the type of vis->glyph" );
     glyphtype = new GLUI_RadioGroup(glyphtype_panel , (&vis->typeGlyph), 6, glyphtype_cb);
+    sampling_x = glui->add_spinner_to_panel(glyphtype_panel, "Glyphs in x-axis", GLUI_SPINNER_INT, &vis->glyph_x, sim->DIM, glyphsampling_cb);
+    sampling_y = glui->add_spinner_to_panel(glyphtype_panel, "Glyphs in y-axis", GLUI_SPINNER_INT, &vis->glyph_y, sim->DIM, glyphsampling_cb );
+    sampling_x->set_int_limits(10,sim->DIM);
+    sampling_y->set_int_limits(10,sim->DIM);
     new GLUI_RadioButton( glyphtype, "default" );
     new GLUI_RadioButton( glyphtype, "cones" );
     new GLUI_RadioButton( glyphtype, "arrows" );
@@ -515,6 +531,19 @@ int main(int argc, char **argv)
     glui->add_checkbox("Show divergence", &vis->display_divergence, -1, divergence_cb);
     glui->add_checkbox("Render smoke", &vis->draw_smoke);
     glui->add_checkbox("Render glyphs", &vis->draw_vecs);
+
+    GLUI_Panel *isolines_panel = new GLUI_Panel(glui, "Isolines options");
+    glui->add_checkbox_to_panel(isolines_panel,"Render Isolines", &vis->draw_iLines);
+    isovalue_Selector = glui->add_spinner_to_panel(isolines_panel, "Value", GLUI_SPINNER_FLOAT, &vis->isoValue);
+    isovalue_Selector->set_float_limits(0,1);
+    //glui->add_checkbox_to_panel(isolines_panel,"Render multiple Isolines", &vis->draw_n_iLines);
+    isoline_number = glui->add_spinner_to_panel(isolines_panel, "Number of Isolines", GLUI_SPINNER_INT, &vis->isoNumber);
+    isoline_number->set_int_limits(1,100);
+    lower_range_selector = glui->add_edittext_to_panel(isolines_panel,"Lower Limit",GLUI_EDITTEXT_FLOAT,&vis->lowerLimit);
+    upper_range_selector= glui->add_edittext_to_panel(isolines_panel,"Upper Limit",GLUI_EDITTEXT_FLOAT,&vis->upperLimit);
+    //number_selector->set_int_limits(1,100);
+
+
 
     GLUI_Panel *height_plot_panel = new GLUI_Panel(glui, "Height plot options");
     glui->add_checkbox_to_panel(height_plot_panel, "Height plot", &vis->height_plot, -1, enable_3d_view);

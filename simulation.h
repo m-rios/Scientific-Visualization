@@ -11,8 +11,8 @@
 class Simulation {
 
 public:
-    const int DIM = 10;				//size of simulation grid
-    double dt = 0.1;				//simulation time step
+    const int DIM = 50;				//size of simulation grid
+    double dt = 0.5;				//simulation time step
     float visc = 0.001;				//fluid viscosity
     fftw_real *vx, *vy;             //(vx,vy)   = velocity field at the current moment
     fftw_real *vx0, *vy0;           //(vx0,vy0) = velocity field at the previous moment
