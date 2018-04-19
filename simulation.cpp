@@ -9,6 +9,11 @@
 //                 for compatibility with the FFTW numerical library.
 Simulation::Simulation()
 {
+    reset_simulation();
+}
+
+void Simulation::reset_simulation(void)
+{
     int i; size_t dim;
     int n = DIM;
     dim     = n * 2*(n/2+1)*sizeof(fftw_real);        //Allocate data structures
@@ -26,11 +31,6 @@ Simulation::Simulation()
 
     for (i = 0; i < n * n; i++)                      //Initialize data structures to 0
     { vx[i] = vy[i] = vx0[i] = vy0[i] = fx[i] = fy[i] = rho[i] = rho0[i] = 0.0f; }
-}
-
-void Simulation::reset_simulation(void)
-{
-    Simulation();
 }
 
 //FFT: Execute the Fast Fourier Transform on the dataset 'vx'.

@@ -152,7 +152,7 @@ void Visualization::set_colormap(float vy)
     else if (scalar_col==COLOR_HEATMAP)
         heatmap(vy, &R, &G, &B);
 
-    if (typeGlyph != 1) {
+    if (typeGlyph == 0) {
         glColor3f(R, G, B);
     } else {
         GLfloat color[] = {R,G,B};
@@ -288,15 +288,15 @@ void Visualization::find_min_max(fftw_real* min_v, fftw_real* max_v, fftw_real* 
 //compute_divergence: computes from the x,y vector field the divergence and assigns it to dataset
 void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *dataset)
 {
-    for (int i = 0; i < sim->DIM - 1; i++)
+    for (int i = 1; i < sim->DIM - 1; i++)
     {
-        for (int j = 0; j < sim->DIM - 1; j++)
+        for (int j = 1; j < sim->DIM - 1; j++)
         {
             int next_x = (j * sim->DIM) + (i + 1); //next in x
             int next_y = ((j + 1) * sim->DIM) + i; //next cell in y
 
             int current = (j * sim->DIM) + i;
-            dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*100;	//Divergence operator
+            dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*10;	//Divergence operator
         }
     }
 }
@@ -342,7 +342,7 @@ void Visualization::prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_r
     if (apply_mode == APPLY_SCALING)    //Apply scaling
     {
         find_min_max(min_v, max_v, dataset);
-        if (*max_v < (fftw_real) 0.0009)
+        if (*max_v < (fftw_real) 0.0009 && !display_divergence)
             for (int i = 0; i < dim; ++i)
                 dataset[i] = 0;
         else
@@ -739,7 +739,7 @@ void Visualization::draw_tubes()
         for (int i = 0; i < line.size()-1; i++)
         {
             glBegin(GL_LINES);
-            glColor3b(1, 1, 1);
+//            glColor3b(1, 1, 1);
             glVertex3d(line[i][0], line[i][1], line[i][2]);
             glVertex3d(line[i+1][0], line[i+1][1], line[i+1][2]);
             glEnd();
@@ -927,7 +927,7 @@ void Visualization::visualize(void) {
             }
             glEnd();
         }
-        else if (typeGlyph == 1) //Conical glyph section
+        else
         {
             fftw_real winX = (fftw_real) gridWidth / (fftw_real) glyph_x;
             fftw_real winY = (fftw_real) gridHeight / (fftw_real) glyph_y;
@@ -938,66 +938,43 @@ void Visualization::visualize(void) {
                     double samplex = winX + (fftw_real) i * winX;
                      double sampley = winY + (fftw_real) j * winY;  
 
+                    fftw_real vector_x, vector_y;
+                    fftw_real scaling;
                     if (vGlyph == 0)//fluid velocity 
-                    {     int index; 
-                        fftw_real vx, vy;
-                         interpolate_2d_point(samplex, sampley, vx, vy, sim->vx, sim->vy, dataset); 
-
-                        double magV = sqrt(pow(vx, 2) + pow(vy, 2)); 
-                        double angleV = atan2(vy, vx);
-                        double deg = angleV * (180 / 3.1415927);
-                        glTranslatef(winX + i * winX, winY + j * winY, 0.0);
-                        glRotatef(90, 0.0, 1.0, 0.0);
-                        glRotatef(-deg, 1.0, 0.0, 0.0);
-                        glutSolidCone(5.0, magV * 500, 20, 20);
-                        glLoadIdentity();
-                    } else if (vGlyph == 1) // force
                     {
-                        printf("Force\n");
-                        int index;
-                         fftw_real fx, fy;
-                         interpolate_2d_point(samplex, sampley, fx, fy, sim->fx, sim->fy, dataset);
-
-                         double magF = sqrt(pow(fx, 2) + pow(fy, 2));
-                         double angleF = atan2(fy, fx);
-                         double deg = angleF * (180 / 3.1415927);
-                        glTranslatef(winX + i * winX, winY + j * winY, 0.0);
-                        glRotatef(90, 0.0, 1.0, 0.0);
-                        glRotatef(-deg, 1.0, 0.0, 0.0);
-                        glutSolidCone(5.0, magF * 500, 20, 20);
-                        glLoadIdentity();
+                         interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->vx, sim->vy, dataset); 
+                        scaling = 500;
                     }
-                }
-            }
-            glDisable(GL_LIGHTING);
-        } else {                  //Arrow glyph section
-            glEnable(GL_LIGHTING);
-            fftw_real winX = (fftw_real) gridWidth / (fftw_real) (glyph_x + 1);
-            fftw_real winY = (fftw_real) gridHeight / (fftw_real) (glyph_y + 1);
-            for (i = 0; i < glyph_x; i++) {
-                for (j = 0; j < glyph_y; j++) {
-                    idx = (j * glyph_y) + i;
-                    set_colormap(dataset[idx]); //applying colourmapping
-                    if (vGlyph == 0)//fluid velocity
+                    else
                     {
-                        double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));
-                        double angleV = atan2(sim->vy[idx], sim->vx[idx]);
-                        double deg = angleV * (180 / 3.1415927);
-                        glTranslatef(i * winX, j * winY, 0.0);
+                        interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->fx, sim->fy, dataset); 
+                        scaling = 300;
+                    }
+
+                    double magV = sqrt(pow(vector_x, 2) + pow(vector_y, 2)); 
+                    double angleV = atan2(vector_y, vector_x);
+                    double deg = angleV * (180 / 3.1415927);
+                    if (typeGlyph == 1) //Conical glyph section
+                    {
+                        glTranslatef(winX + i * winX, winY + j * winY, 0.0);
                         glRotatef(90, 0.0, 1.0, 0.0);
                         glRotatef(-deg, 1.0, 0.0, 0.0);
-                        glutSolidCone(5.0, magV * 500, 20, 20);
+                        glutSolidCone(5.0, magV * scaling, 20, 20);
                         glLoadIdentity();
-                    } else if (vGlyph == 1) // force
+                    } else //arrow
                     {
-                        double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
-                        double angleF = atan2(sim->fy[idx], sim->fx[idx]);
-                        double deg = angleF * (180 / 3.1415927);
-                        glTranslatef(i * wn, j * hn, 0.0);
+                        scaling -= 50;
+                        double end_x = (winX + (fftw_real) i * winX) + scaling * cos(angleV) * magV;
+                        double end_y = (winY + (fftw_real) j * winY) + scaling * sin(angleV) * magV;
+                        glTranslatef(end_x, end_y, 0.0);
                         glRotatef(90, 0.0, 1.0, 0.0);
                         glRotatef(-deg, 1.0, 0.0, 0.0);
-                        glutSolidCone(5.0, magF * 500, 20, 20);
+                        glutSolidCone(2.0, 6.0, 20, 20);
                         glLoadIdentity();
+                        glBegin(GL_LINES);
+                        glVertex2f(winX + (fftw_real) i * winX, winY + (fftw_real) j * winY);
+                        glVertex2f( end_x, end_y);
+                        glEnd();
                     }
                 }
             }

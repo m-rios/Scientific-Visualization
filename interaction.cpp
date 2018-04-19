@@ -111,14 +111,15 @@ void divergence_cb( int control )
     if (vis->display_divergence)
     {
         clamp_min_spinner->set_int_limits(-1, 0);
-        clamp_min_spinner->set_float_val(-0.1);
-        clamp_max_spinner->set_float_val(0.1);
+        clamp_min_spinner->set_float_val(-0.01);
+        clamp_max_spinner->set_float_val(0.01);
 
     }
     else
     {
         clamp_min_spinner->set_int_limits(0, 1);
         clamp_min_spinner->set_int_val(0);
+        clamp_max_spinner->set_int_val(1);
     }
 }
 
@@ -527,7 +528,6 @@ int main(int argc, char **argv)
     clamp_max_spinner->set_float_val(1.0f);
     clamp_min_spinner->set_float_val(0.0f);
 
-    glui->add_checkbox("Dynamic scaling", &vis->dynamic_scalling);
     glui->add_checkbox("Show divergence", &vis->display_divergence, -1, divergence_cb);
     glui->add_checkbox("Render smoke", &vis->draw_smoke);
     glui->add_checkbox("Render glyphs", &vis->draw_vecs);

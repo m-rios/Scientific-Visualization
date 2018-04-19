@@ -60,7 +60,6 @@ public:
     float clamp_max = 1.0f;
     unsigned int	textureID[3];
     int display_divergence = 0;
-    int dynamic_scalling = 0;
     int height_plot = 0;
     int glyph = 0;
     int vGlyph = 0;
