@@ -908,7 +908,7 @@ void Visualization::visualize(void) {
                     if (vGlyph == 0)//fluid velocity
                     {
                         //(3.1415927 / 180.0) * angle;
-                        double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));â€¨
+                        double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));
                         double angleV = atan2(sim->vy[idx], sim->vx[idx]);
                         glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
                         glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
@@ -917,7 +917,7 @@ void Visualization::visualize(void) {
 
                     if (vGlyph == 1)//force
                     {
-                        double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));â€¨
+                        double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));
                         double angleF = atan2(sim->fy[idx], sim->fx[idx]);
                         glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
                         glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
@@ -936,22 +936,22 @@ void Visualization::visualize(void) {
                 for (i = 0; i < glyph_x; i++) {
                     //Get sample point coordinates
                     double samplex = winX + (fftw_real) i * winX;
-                    â€¨double sampley = winY + (fftw_real) j * winY;â€¨â€¨
+                    double sampley = winY + (fftw_real) j * winY;
 
                     fftw_real vector_x, vector_y;
                     fftw_real scaling;
                     if (vGlyph == 0)//fluid velocityâ€¨
                     {
-                        â€¨interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->vx, sim->vy, dataset);â€¨
+                        interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->vx, sim->vy, dataset);
                         scaling = 500;
                     }
                     else
                     {
-                        interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->fx, sim->fy, dataset);â€¨
+                        interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->fx, sim->fy, dataset);
                         scaling = 300;
                     }
 
-                    double magV = sqrt(pow(vector_x, 2) + pow(vector_y, 2));â€¨
+                    double magV = sqrt(pow(vector_x, 2) + pow(vector_y, 2));
                     double angleV = atan2(vector_y, vector_x);
                     double deg = angleV * (180 / 3.1415927);
                     if (typeGlyph == 1) //Conical glyph section
