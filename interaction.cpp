@@ -111,8 +111,8 @@ void divergence_cb( int control )
     if (vis->display_divergence)
     {
         clamp_min_spinner->set_int_limits(-1, 0);
-        clamp_min_spinner->set_float_val(-0.01);
-        clamp_max_spinner->set_float_val(0.01);
+        clamp_min_spinner->set_float_val(-0.1);
+        clamp_max_spinner->set_float_val(0.1);
 
     }
     else

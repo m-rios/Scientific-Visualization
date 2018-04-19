@@ -296,7 +296,7 @@ void Visualization::compute_divergence(fftw_real *x, fftw_real *y, fftw_real *da
             int next_y = ((j + 1) * sim->DIM) + i; //next cell in y
 
             int current = (j * sim->DIM) + i;
-            dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*10;	//Divergence operator
+            dataset[current] = ((x[next_x] - x[current])/wn + (y[next_y] - y[current])/hn)*500;	//Divergence operator
         }
     }
 }
@@ -342,10 +342,10 @@ void Visualization::prepare_dataset(fftw_real* dataset, fftw_real* min_v, fftw_r
     if (apply_mode == APPLY_SCALING)    //Apply scaling
     {
         find_min_max(min_v, max_v, dataset);
-        if (*max_v < (fftw_real) 0.0009 && !display_divergence)
-            for (int i = 0; i < dim; ++i)
-                dataset[i] = 0;
-        else
+//        if (*max_v < (fftw_real) 0.0009 && !display_divergence)
+//            for (int i = 0; i < dim; ++i)
+//                dataset[i] = 0;
+//        else
             for (int i = 0; i < dim; ++i)
                 dataset[i] = scale(*min_v, *max_v, dataset[i]);
     }
@@ -854,7 +854,7 @@ void Visualization::interpolate_2d_point(GLdouble x, GLdouble y, fftw_real &vx, 
 
     //Interpolate scalar field for colour
     fftw_real val = b1*scalar_dataset[idx0] + b2*scalar_dataset[idx1] + b3*scalar_dataset[idx2] + b4*scalar_dataset[idx3];
-    set_colormap(val); //applying colourmapping  
+    set_colormap(val); //applying colourmappingâ€¨â€¨
 }
 
 
@@ -908,7 +908,7 @@ void Visualization::visualize(void) {
                     if (vGlyph == 0)//fluid velocity
                     {
                         //(3.1415927 / 180.0) * angle;
-                        double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2)); 
+                        double magV = sqrt(pow(sim->vx[idx], 2) + pow(sim->vy[idx], 2));â€¨
                         double angleV = atan2(sim->vy[idx], sim->vx[idx]);
                         glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
                         glVertex2f((wn + (fftw_real) i * wn) + vec_scale * cos(angleV) * magV,
@@ -917,7 +917,7 @@ void Visualization::visualize(void) {
 
                     if (vGlyph == 1)//force
                     {
-                        double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2)); 
+                        double magF = sqrt(pow(sim->fx[idx], 2) + pow(sim->fy[idx], 2));â€¨
                         double angleF = atan2(sim->fy[idx], sim->fx[idx]);
                         glVertex2f(wn + (fftw_real) i * wn, hn + (fftw_real) j * hn);
                         glVertex2f((wn + (fftw_real) i * wn) + 500 * cos(angleF) * magF,
@@ -936,22 +936,22 @@ void Visualization::visualize(void) {
                 for (i = 0; i < glyph_x; i++) {
                     //Get sample point coordinates
                     double samplex = winX + (fftw_real) i * winX;
-                     double sampley = winY + (fftw_real) j * winY;  
+                    â€¨double sampley = winY + (fftw_real) j * winY;â€¨â€¨
 
                     fftw_real vector_x, vector_y;
                     fftw_real scaling;
-                    if (vGlyph == 0)//fluid velocity 
+                    if (vGlyph == 0)//fluid velocityâ€¨
                     {
-                         interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->vx, sim->vy, dataset); 
+                        â€¨interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->vx, sim->vy, dataset);â€¨
                         scaling = 500;
                     }
                     else
                     {
-                        interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->fx, sim->fy, dataset); 
+                        interpolate_2d_point(samplex, sampley, vector_x, vector_y, sim->fx, sim->fy, dataset);â€¨
                         scaling = 300;
                     }
 
-                    double magV = sqrt(pow(vector_x, 2) + pow(vector_y, 2)); 
+                    double magV = sqrt(pow(vector_x, 2) + pow(vector_y, 2));â€¨
                     double angleV = atan2(vector_y, vector_x);
                     double deg = angleV * (180 / 3.1415927);
                     if (typeGlyph == 1) //Conical glyph section
